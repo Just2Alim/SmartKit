@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "961507831676",
+    "project_id": "smartkit-a245a",
+    "storage_bucket": "smartkit-a245a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:961507831676:android:b7966fa4c0249724293ef9",
+        "android_client_info": {
+          "package_name": "com.example.smartkit"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCGvBDxWfsI46B9uirNjzNPToRRs6giR5c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

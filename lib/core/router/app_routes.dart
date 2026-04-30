@@ -1,0 +1,44 @@
+class AppRoutes {
+  static const splash = '/';
+  static const onboarding = '/onboarding';
+  static const login = '/login';
+  static const signup = '/signup';
+  static const chooseRole = '/choose-role';
+
+  static const main = '/main';
+  static const dashboard = '/dashboard';
+  static const addMedicine = '/add-medicine';
+  static const medicineDetail = '/medicine-detail';
+  static const notifications = '/notifications';
+  static const search = '/search';
+  static const family = '/family';
+  static const addFamilyMember = '/add-family-member';
+  static const familyMemberProfile = '/family-member-profile';
+  static const familyMemberMedicines = '/family-member-medicines';
+  static const profile = '/profile';
+  static const editProfile = '/edit-profile';
+  static const settings = '/settings';
+  static const analytics = '/analytics';
+  static const aiChat = '/ai-chat';
+  static const aiFeatures = '/ai-features';
+  static const aiKitBuilder = '/ai-kit-builder';
+  static const aiRecommendations = '/ai-recommendations';
+  static const shop = '/shop';
+  static const shopProduct = '/shop-product';
+  static const cart = '/cart';
+  static const editMedicine = '/edit-medicine';
+  static const editFamilyMember = '/edit-family-member';
+  static const reminders = '/reminders';
+  static const addReminder = '/add-reminder';
+  static const b2bOnboarding = '/b2b-onboarding';
+  static const b2bLogin = '/b2b-login';
+  static const b2bSignup = '/b2b-signup';
+  static const b2bDashboard = '/b2b-dashboard';
+  static const b2bInventory = '/b2b-inventory';
+  static const b2bAddMedicine = '/b2b-add-medicine';
+  static const b2bMedicineDetail = '/b2b-medicine-detail';
+  static const b2bNotifications = '/b2b-notifications';
+  static const b2bReports = '/b2b-reports';
+  static const b2bSettings = '/b2b-settings';
+  static const b2bTeam = '/b2b-team';
+}
