@@ -44,6 +44,16 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# API Keys - never commit!
+# API Keys and Secrets - never commit!
 lib/core/constants/api_keys.dart
 lib/firebase_options.dart
+.env*
+*.jks
+*.keystore
+*.key
+*.pem
+key.properties
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+ios/firebase_app_id_file.json
+macos/Runner/GoogleService-Info.plist
