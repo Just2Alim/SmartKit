@@ -1,6 +1,6 @@
 # 🏥 SmartKit — Your Ultimate Health Companion
 
-![SmartKit Banner](assets/readme/banner.png)
+![SmartKit Banner](assets/readme/smartkit_readme_banner_1777584784757.jpg)
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.22.0+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Firebase](https://img.shields.io/badge/Firebase-Auth%20%7C%20Firestore-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com)
