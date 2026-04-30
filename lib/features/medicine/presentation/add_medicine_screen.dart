@@ -5,11 +5,20 @@ import '../../family/data/family_repository.dart';
 import '../../family/models/family_member_model.dart';
 import '../data/medicine_repository.dart';
 import '../models/medicine_model.dart';
+import '../../../core/router/app_routes.dart';
+
 
 class AddMedicineScreen extends StatefulWidget {
   final String? preselectedMemberId;
+  final String? initialName;
+  final String? initialCategory;
 
-  const AddMedicineScreen({super.key, this.preselectedMemberId});
+  const AddMedicineScreen({
+    super.key, 
+    this.preselectedMemberId,
+    this.initialName,
+    this.initialCategory,
+  });
 
   @override
   State<AddMedicineScreen> createState() => _AddMedicineScreenState();
@@ -46,6 +55,14 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
 
     if (widget.preselectedMemberId != null) {
       selectedOwner = widget.preselectedMemberId!;
+    }
+    
+    if (widget.initialName != null) {
+      nameCtrl.text = widget.initialName!;
+    }
+    
+    if (widget.initialCategory != null && categories.contains(widget.initialCategory)) {
+      selectedCategory = widget.initialCategory!;
     }
   }
 
@@ -213,8 +230,22 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
               _label('Название'),
               TextField(
                 controller: nameCtrl,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'Например: Парацетамол',
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.qr_code_scanner_rounded),
+                    onPressed: () async {
+                      final result = await Navigator.pushNamed(context, AppRoutes.scanBarcode);
+                      if (result != null && result is Map<String, dynamic> && result['manual'] != true) {
+                        setState(() {
+                          nameCtrl.text = result['name'] ?? nameCtrl.text;
+                          if (result['category'] != null && categories.contains(result['category'])) {
+                            selectedCategory = result['category'];
+                          }
+                        });
+                      }
+                    },
+                  ),
                 ),
               ),
               const SizedBox(height: 16),

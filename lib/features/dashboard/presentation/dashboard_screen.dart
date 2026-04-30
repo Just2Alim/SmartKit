@@ -67,8 +67,16 @@ class DashboardScreen extends StatelessWidget {
                 context: context,
                 title: 'Мои лекарства',
                 actionText: 'Добавить',
-                onTap: () {
-                  Navigator.pushNamed(context, AppRoutes.addMedicine);
+                onTap: () async {
+                  final result = await Navigator.pushNamed(context, AppRoutes.scanBarcode);
+                  if (result != null && result is Map<String, dynamic>) {
+                    if (!context.mounted) return;
+                    Navigator.pushNamed(
+                      context,
+                      AppRoutes.addMedicine,
+                      arguments: result['manual'] == true ? {'name': ''} : result,
+                    );
+                  }
                 },
               ),
               const SizedBox(height: 12),
@@ -428,8 +436,20 @@ class DashboardScreen extends StatelessWidget {
       itemBuilder: (context, index) {
         final item = items[index];
         return InkWell(
-          onTap: () {
-            Navigator.pushNamed(context, item.$5);
+          onTap: () async {
+            if (item.$5 == AppRoutes.addMedicine) {
+              final result = await Navigator.pushNamed(context, AppRoutes.scanBarcode);
+              if (result != null && result is Map<String, dynamic>) {
+                if (!context.mounted) return;
+                Navigator.pushNamed(
+                  context,
+                  AppRoutes.addMedicine,
+                  arguments: result['manual'] == true ? {'name': ''} : result,
+                );
+              }
+            } else {
+              Navigator.pushNamed(context, item.$5);
+            }
           },
           borderRadius: BorderRadius.circular(24),
           child: Container(
@@ -920,6 +940,107 @@ class DashboardScreen extends StatelessWidget {
               Icons.arrow_forward_ios_rounded,
               color: Colors.white,
               size: 18,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddMedicineSelection(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Добавить лекарство',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: _selectionCard(
+                    context: context,
+                    title: 'Сканировать',
+                    subtitle: 'Штрих-код',
+                    icon: Icons.qr_code_scanner_rounded,
+                    color: const Color(0xFF2563EB),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushNamed(context, AppRoutes.scanBarcode);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _selectionCard(
+                    context: context,
+                    title: 'Вручную',
+                    subtitle: 'Ввести данные',
+                    icon: Icons.edit_note_rounded,
+                    color: const Color(0xFF16A34A),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushNamed(context, AppRoutes.addMedicine);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _selectionCard({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 32),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 12,
+                color: color.withOpacity(0.8),
+              ),
             ),
           ],
         ),

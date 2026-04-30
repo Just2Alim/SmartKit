@@ -23,6 +23,7 @@ class AppRoutes {
   static const aiFeatures = '/ai-features';
   static const aiKitBuilder = '/ai-kit-builder';
   static const aiRecommendations = '/ai-recommendations';
+  static const scanBarcode = '/scan-barcode';
   static const shop = '/shop';
   static const shopProduct = '/shop-product';
   static const cart = '/cart';

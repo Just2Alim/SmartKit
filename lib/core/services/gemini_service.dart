@@ -3,9 +3,11 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import '../../features/medicine/models/medicine_model.dart';
 import '../constants/api_keys.dart';
 
+import 'ai_service_interface.dart';
+
 /// Сервис для работы с Gemini AI.
 /// Использует контекст аптечки пользователя для умных ответов.
-class GeminiService {
+class GeminiService implements AiService {
   static GeminiService? _instance;
   static GeminiService get instance => _instance ??= GeminiService._();
   GeminiService._();

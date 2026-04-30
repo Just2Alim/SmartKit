@@ -12,6 +12,7 @@ import '../../features/family/presentation/family_screen.dart';
 import '../../features/medicine/presentation/add_medicine_screen.dart';
 import '../../features/medicine/presentation/medicine_detail_screen.dart';
 import '../../features/medicine/presentation/edit_medicine_screen.dart';
+import '../../features/medicine/presentation/barcode_scanner_screen.dart';
 import '../../features/family/presentation/family_member_medicines_screen.dart';
 import '../../features/family/presentation/family_member_profile_screen.dart';
 import '../../features/family/presentation/add_family_member_screen.dart';
@@ -75,8 +76,18 @@ class AppRouter {
         return _page(DashboardScreen());
 
       case AppRoutes.addMedicine:
-        final memberId = settings.arguments as String?;
-        return _page(AddMedicineScreen(preselectedMemberId: memberId));
+        final args = settings.arguments;
+        if (args is Map<String, dynamic>) {
+          return _page(AddMedicineScreen(
+            preselectedMemberId: args['memberId'] as String?,
+            initialName: args['name'] as String?,
+            initialCategory: args['category'] as String?,
+          ));
+        }
+        return _page(AddMedicineScreen(preselectedMemberId: args as String?));
+
+      case AppRoutes.scanBarcode:
+        return _page(const BarcodeScannerScreen());
 
       case AppRoutes.medicineDetail:
         final medicineId = settings.arguments as String;

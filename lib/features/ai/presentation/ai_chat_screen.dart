@@ -2,6 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/services/ai_provider.dart';
+import '../../../core/services/ai_service_interface.dart';
 import '../../../core/services/gemini_service.dart';
 import '../../medicine/data/medicine_repository.dart';
 import '../../medicine/models/medicine_model.dart';
@@ -24,6 +26,8 @@ class _AiChatScreenState extends State<AiChatScreen>
   List<MedicineModel> medicines = [];
   bool isLoadingMedicines = true;
   bool isAiTyping = false;
+  AiService? _aiService;
+  bool _isLocalAi = false;
 
   final List<_ChatMessage> messages = [];
 
@@ -53,8 +57,11 @@ class _AiChatScreenState extends State<AiChatScreen>
       medicines = await _medicineRepository.getMedicinesByUser(user.uid).first;
     }
 
-    // Инициализируем Gemini с контекстом аптечки
-    GeminiService.instance.initWithMedicines(medicines);
+    _isLocalAi = await AiProvider.isLocalAiEnabled();
+    _aiService = await AiProvider.getService();
+
+    // Инициализируем AI сервис с контекстом аптечки
+    _aiService?.initWithMedicines(medicines);
 
     _addInitialMessage();
 
@@ -93,7 +100,8 @@ class _AiChatScreenState extends State<AiChatScreen>
 
     _scrollToBottom();
 
-    final response = await GeminiService.instance.sendMessage(text);
+    final response = await (_aiService?.sendMessage(text) ?? 
+        Future.value("Ошибка: AI сервис не инициализирован"));
 
     if (mounted) {
       setState(() {
@@ -118,9 +126,149 @@ class _AiChatScreenState extends State<AiChatScreen>
       messages.clear();
       isAiTyping = false;
     });
-    GeminiService.instance.resetChat(medicines);
+    _aiService?.resetChat(medicines);
     _addInitialMessage();
     setState(() {});
+  }
+
+  void _showAiSettings() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Настройки AI',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Выберите провайдера искусственного интеллекта',
+                style: TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 24),
+              _buildAiOption(
+                title: 'Gemini (Cloud)',
+                subtitle: 'Мощная модель, требует интернет и API ключ',
+                icon: Icons.cloud_queue_rounded,
+                selected: !_isLocalAi,
+                onTap: () async {
+                  await AiProvider.setLocalAiEnabled(false);
+                  setState(() => _isLocalAi = false);
+                  setModalState(() {});
+                  _updateAiService();
+                },
+              ),
+              const SizedBox(height: 12),
+              _buildAiOption(
+                title: 'Ollama (Local)',
+                subtitle: 'Работает на вашем ПК, безлимитно, приватно',
+                icon: Icons.computer_rounded,
+                selected: _isLocalAi,
+                onTap: () async {
+                  await AiProvider.setLocalAiEnabled(true);
+                  setState(() => _isLocalAi = true);
+                  setModalState(() {});
+                  _updateAiService();
+                },
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFA855F7),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Готово'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAiOption({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: selected ? const Color(0xFFA855F7) : Colors.grey.withOpacity(0.3),
+            width: 2,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          color: selected ? const Color(0xFFA855F7).withOpacity(0.05) : null,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: selected ? const Color(0xFFA855F7) : Colors.grey,
+              size: 32,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: selected ? const Color(0xFFA855F7) : null,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+            if (selected)
+              const Icon(Icons.check_circle_rounded, color: Color(0xFFA855F7)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _updateAiService() async {
+    _aiService = await AiProvider.getService();
+    _aiService?.initWithMedicines(medicines);
+    // Опционально: можно добавить системное сообщение о смене провайдера
+    if (mounted) {
+      setState(() {
+        messages.add(_ChatMessage(
+          text: '🔄 Переключено на ${_isLocalAi ? "локальный AI (Ollama)" : "облачный AI (Gemini)"}',
+          isUser: false,
+        ));
+      });
+      _scrollToBottom();
+    }
   }
 
   List<String> get _quickPrompts {
@@ -184,12 +332,14 @@ class _AiChatScreenState extends State<AiChatScreen>
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                 ),
                 Text(
-                  isAiTyping ? 'печатает...' : 'онлайн • Gemini',
+                  isAiTyping 
+                      ? 'печатает...' 
+                      : (_isLocalAi ? 'онлайн • Ollama (Локально)' : 'онлайн • Gemini (Облако)'),
                   style: TextStyle(
                     fontSize: 11,
                     color: isAiTyping
                         ? const Color(0xFFA855F7)
-                        : Colors.green,
+                        : (_isLocalAi ? Colors.blue : Colors.green),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -198,6 +348,11 @@ class _AiChatScreenState extends State<AiChatScreen>
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'Настройки AI',
+            icon: const Icon(Icons.settings_suggest_rounded),
+            onPressed: _showAiSettings,
+          ),
           IconButton(
             tooltip: 'Новый чат',
             icon: const Icon(Icons.refresh_rounded),
