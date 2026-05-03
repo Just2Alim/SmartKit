@@ -21,9 +21,19 @@
 - [x] **B2B Product Operations**: Added unified add/edit product flow, OCR autofill, quick stock receipt, and richer product metadata for reports and shop display.
 - [x] **Empty-State Stability**: Fixed B2B add/report flows so empty locations, sales, or inventory no longer cause infinite loading.
 - [x] **Unified Theme & Dark Mode Pass**: Added shared theme tokens, reusable UI primitives, and dark-mode-safe surfaces across core B2B and shop flows.
+- [x] **AI Reliability & Safety Pass**: Added centralized medical/business guardrails, Ollama endpoint fallbacks, deterministic offline answers, and B2B analytics fallback so AI cards no longer surface raw Ollama connection errors.
+- [x] **AI Language Consistency**: Added latest-message language detection, strict per-request language instructions, mixed-language repair retries, and localized AI fallbacks for B2C, B2B, Gemini reserve, and AI kit cart summaries.
+- [x] **AI Kit Builder & Cart Handoff**: Rebuilt B2C kit assembly around user needs, current home medicines, live Firestore catalog matching, missing-item warnings, confirmation buttons, cart creation, and cart navigation.
 - [ ] **Activity Detail/Navigation**: Add a dedicated screen to view the full history of activities, including filtering by type.
 
 ## Completed Work
+- **AI Reliability, Safety & Kit Assembly**:
+  - Added shared AI safety prompts and deterministic request screening for emergency symptoms, off-topic requests, contraindication-sensitive contexts, and B2B compliance boundaries.
+  - Added language matching for AI answers: the last user message decides Russian, English, or Kazakh output, with automatic repair if a model mixes languages.
+  - Updated Ollama-backed B2C and B2B services to try localhost, 127.0.0.1, and Android emulator host endpoints before falling back to safe local logic.
+  - Replaced raw Ollama connection errors with useful offline responses for B2C inventory/symptom questions and B2B stock/sales/location analysis.
+  - Added a B2C kit planner that uses the user's current medicines and live B2B catalog to avoid duplicates, skip restricted categories, flag missing essentials, and build a safe purchasable plan.
+  - Connected AI chat and the kit builder screen to confirmation-based cart creation and automatic navigation to the cart.
 - **Unified Design System & Dark Mode**:
   - Expanded `AppTheme` with full light/dark color schemes, text styles, button, card, input, chip, navigation, dialog, and snackbar theming.
   - Expanded `AppColors` with brand, dark-surface, semantic, border, shadow, and adaptive helper tokens.

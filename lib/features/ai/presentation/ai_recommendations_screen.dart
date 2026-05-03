@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/router/app_routes.dart';
 import '../../medicine/data/medicine_repository.dart';
 import '../../medicine/models/medicine_model.dart';
 
@@ -18,10 +19,6 @@ class AiRecommendationsScreen extends StatelessWidget {
           n.contains('парацетамол') ||
           n.contains('ибупрофен') ||
           n.contains('цитрамон'),
-    );
-
-    final hasVitamins = names.any(
-      (n) => n.contains('витамин') || n.contains('d3'),
     );
 
     final hasAntiseptic = names.any(
@@ -42,19 +39,40 @@ class AiRecommendationsScreen extends StatelessWidget {
 
     if (!hasPainkiller) {
       recommendations.add(
-        'Добавь базовое обезболивающее и жаропонижающее в аптечку.',
-      );
-    }
-
-    if (!hasVitamins) {
-      recommendations.add(
-        'Можно добавить витамины для базового домашнего набора.',
+        'Нет базового обезболивающего/жаропонижающего. Подберите безопасный безрецептурный вариант с учетом противопоказаний.',
       );
     }
 
     if (!hasAntiseptic) {
       recommendations.add(
-        'Стоит добавить антисептик для обработки мелких ран и ссадин.',
+        'Нет антисептика для мелких ран и ссадин. Добавьте хлоргексидин/мирамистин или аналог из инструкции.',
+      );
+    }
+
+    final hasAllergy = names.any(
+      (n) =>
+          n.contains('лоратадин') ||
+          n.contains('цетрин') ||
+          n.contains('зодак') ||
+          n.contains('зиртек') ||
+          n.contains('супрастин'),
+    );
+    if (!hasAllergy) {
+      recommendations.add(
+        'Нет базового средства от аллергии. Для детей, беременности и хронических болезней выбирайте только после консультации.',
+      );
+    }
+
+    final hasDigestive = names.any(
+      (n) =>
+          n.contains('регидрон') ||
+          n.contains('смекта') ||
+          n.contains('полисорб') ||
+          n.contains('энтеросгель'),
+    );
+    if (!hasDigestive) {
+      recommendations.add(
+        'Нет базового набора для ЖКТ: регидратация и сорбент часто полезнее, чем случайные таблетки от живота.',
       );
     }
 
@@ -78,7 +96,7 @@ class AiRecommendationsScreen extends StatelessWidget {
 
     if (recommendations.isEmpty) {
       recommendations.add(
-        'Аптечка выглядит довольно сбалансированной. Проверь только сроки и остатки.',
+        'Аптечка выглядит сбалансированной. Поддерживайте сроки годности, остатки и хранение по инструкции.',
       );
     }
 
@@ -90,7 +108,6 @@ class AiRecommendationsScreen extends StatelessWidget {
     final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
-
       appBar: AppBar(title: const Text('AI рекомендации')),
       body:
           user == null
@@ -230,6 +247,31 @@ class AiRecommendationsScreen extends StatelessWidget {
                                 ],
                               ),
                             ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 54,
+                          child: FilledButton.icon(
+                            onPressed:
+                                () => Navigator.pushNamed(
+                                  context,
+                                  AppRoutes.aiKitBuilder,
+                                ),
+                            icon: const Icon(Icons.medical_services_rounded),
+                            label: const Text('Собрать базовую аптечку'),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          'SmartKit не ставит диагноз и не назначает лечение. Перед применением проверяйте инструкцию, противопоказания и срок годности.',
+                          style: TextStyle(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontSize: 12,
+                            height: 1.35,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],

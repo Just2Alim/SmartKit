@@ -4,6 +4,7 @@ import '../../features/medicine/models/medicine_model.dart';
 import '../constants/api_keys.dart';
 
 import 'ai_service_interface.dart';
+import 'ai_safety.dart';
 
 /// Сервис для работы с Gemini AI.
 /// Использует контекст аптечки пользователя для умных ответов.
@@ -12,50 +13,13 @@ class GeminiService implements AiService {
   static GeminiService get instance => _instance ??= GeminiService._();
   GeminiService._();
 
-  GenerativeModel? _model;
   ChatSession? _chat;
 
-  /// Системный промпт — описывает ИИ его роль в SmartKit
-  static const String _systemPrompt = '''
-Ты — SmartKit AI, специализированная экспертная система по управлению домашней аптечкой. Твоя миссия — безопасность и информированность пользователя в вопросах хранения и использования лекарств.
-
-СТАТУС И ГРАНИЦЫ:
-- Твоя база знаний ограничена фармакологией, первой помощью и управлением инвентарем.
-- Ты СТРОГО привязан к приложению SmartKit. Любой запрос вне этой темы должен быть отклонен.
-
-ЧТО ТЕБЕ РАЗРЕШЕНО (WHITE LIST):
-1. АНАЛИЗ ИНВЕНТАРЯ: Отвечать на вопросы о том, что есть в аптечке пользователя, сколько осталось и не вышел ли срок годности.
-2. ПОДБОР ПО СИМПТОМАМ: На основе имеющихся у пользователя лекарств подсказывать, что МОЖЕТ помочь (например: "У вас есть Ибупрофен, он помогает от боли").
-3. ПЛАНИРОВАНИЕ: Составлять списки необходимых лекарств для поездок, походов или базовой домашней аптечки.
-4. ХРАНЕНИЕ: Давать советы по правильному хранению препаратов (температура, свет, влажность).
-5. СОВМЕСТИМОСТЬ: Предупреждать о явных опасностях смешивания известных препаратов (с обязательной ссылкой на инструкцию).
-6. ОБУЧЕНИЕ: Рассказывать, что должно быть в аптечке первой помощи и как оказать доврачебную помощь при мелких травмах.
-
-ЧТО ТЕБЕ КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО (BLACK LIST):
-1. ПРОГРАММИРОВАНИЕ: Писать, отлаживать или объяснять код на любом языке (Python, C++, JS и т.д.).
-2. КРЕАТИВ: Писать стихи, рассказы, сценарии, анекдоты или песни.
-3. ОБЩИЕ ЗНАНИЯ: Обсуждать историю, политику, науку (не связанную с медициной), знаменитостей или новости.
-4. БЫТОВЫЕ ЗАДАЧИ: Давать кулинарные рецепты, советы по ремонту, финансовые или юридические консультации.
-5. МАТЕМАТИКА: Решать уравнения, задачи или проводить сложные вычисления.
-6. ПЕРЕВОД: Переводить тексты общего характера.
-7. РОЛЕВЫЕ ИГРЫ: Принимать на себя другие роли (профессор, друг, пират и т.д.).
-
-ПРОТОКОЛ БЕЗОПАСНОСТИ:
-- ДИАГНОЗЫ: Никогда не ставь окончательный диагноз. Используй формулировки "похоже на", "может быть".
-- ВРАЧИ: В каждом ответе, где упоминаются симптомы, добавляй: "Обязательно проконсультируйтесь с врачом".
-- ЭКСТРЕННЫЕ СИТУАЦИИ: При упоминании критических состояний (потеря сознания, сильное кровотечение, боль в сердце, удушье) ТВОЙ ПЕРВЫЙ И ЕДИНСТВЕННЫЙ СОВЕТ: "НЕМЕДЛЕННО ВЫЗЫВАЙТЕ СКОРУЮ ПОМОЩЬ (103/112)".
-
-МЕХАНИЗМ ОТКАЗА (ИСПОЛЬЗОВАТЬ ТОЛЬКО ДЛЯ BLACK LIST):
-- Если запрос пользователя относится к BLACK LIST, ты ОБЯЗАН ответить: "Я — SmartKit AI. Моя специализация ограничена помощью с аптечкой и медицинскими данными. Я не могу выполнить этот запрос, так как он не связан с моей основной задачей."
-- ДЛЯ ВСЕХ ОСТАЛЬНЫХ ЗАПРОСОВ (из WHITE LIST) отвечай сразу по существу, БЕЗ этой фразы и БЕЗ лишних самопредставлений.
-
-ЯЗЫК: Только Русский.
-''';
-
   /// Инициализация модели с контекстом аптечки пользователя.
+  @override
   void initWithMedicines(List<MedicineModel> medicines) {
     final systemContext = _buildSystemContext(medicines);
-    
+
     final model = GenerativeModel(
       model: 'gemini-2.0-flash',
       apiKey: ApiKeys.geminiApiKey,
@@ -66,77 +30,121 @@ class GeminiService implements AiService {
       ),
     );
 
-    _model = model;
     _chat = model.startChat();
   }
 
   /// Строим контекст с реальными данными аптечки
   String _buildSystemContext(List<MedicineModel> medicines) {
-    final buffer = StringBuffer();
-    buffer.writeln(_systemPrompt);
-
-    if (medicines.isEmpty) {
-      buffer.writeln('\nСОСТОЯНИЕ АПТЕЧКИ: Аптечка пользователя пуста. Предложи начать добавлять препараты.');
-    } else {
-      buffer.writeln('\n--- ТЕКУЩАЯ АПТЕЧКА ПОЛЬЗОВАТЕЛЯ ---');
-      final now = DateTime.now();
-
-      for (final med in medicines) {
-        buffer.write('• ${med.name}');
-        if (med.dosage.isNotEmpty) buffer.write(' (${med.dosage})');
-        buffer.write(', количество: ${med.quantity}');
-
-        if (med.category.isNotEmpty) {
-          buffer.write(', категория: ${med.category}');
-        }
-
-        if (med.expiryDate != null) {
-          final diff = med.expiryDate!.difference(now).inDays;
-          if (diff < 0) {
-            buffer.write(' [ПРОСРОЧЕНО ${-diff} дней назад!]');
-          } else if (diff <= 30) {
-            buffer.write(' [истекает через $diff дней!]');
-          } else {
-            buffer.write(', годен до ${_formatDate(med.expiryDate!)}');
-          }
-        }
-        buffer.writeln();
-      }
-
-      buffer.writeln('--- КОНЕЦ АПТЕЧКИ ---');
-      buffer.writeln('Итого препаратов: ${medicines.length}');
-    }
-
-    return buffer.toString();
+    return AiSafety.buildConsumerMedicineContext(medicines);
   }
 
-  String _formatDate(DateTime date) =>
-      '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
-
   /// Отправить сообщение и получить ответ
+  @override
   Future<String> sendMessage(String text) async {
+    final safetyDecision = AiSafety.screenConsumerRequest(text);
+    if (safetyDecision != null) {
+      return safetyDecision.response;
+    }
+
     if (_chat == null) {
-      return 'AI не инициализирован. Пожалуйста, подождите или перезапустите чат.';
+      return _notInitializedMessage(text);
     }
 
     try {
       debugPrint('AI Request: $text');
-      final response = await _chat!.sendMessage(Content.text(text));
-      final responseText = response.text ?? 'Нет ответа от AI';
+      final promptText = AiSafety.wrapUserMessageWithLanguageInstruction(text);
+      final response = await _chat!.sendMessage(Content.text(promptText));
+      var responseText = response.text ?? _emptyResponseMessage(text);
+
+      if (AiSafety.appearsToUseDifferentLanguage(responseText, text)) {
+        final repairResponse = await _chat!.sendMessage(
+          Content.text(
+            AiSafety.languageRepairPrompt(
+              userText: text,
+              assistantAnswer: responseText,
+            ),
+          ),
+        );
+        final repairedText = repairResponse.text;
+        if (repairedText != null &&
+            repairedText.trim().isNotEmpty &&
+            !AiSafety.appearsToUseDifferentLanguage(repairedText, text)) {
+          responseText = repairedText.trim();
+        } else {
+          responseText = _languageFallbackMessage(text);
+        }
+      }
+
       debugPrint('AI Response: $responseText');
       return responseText;
     } catch (e) {
       debugPrint('AI Error: $e');
       String errorMsg = e.toString();
       if (errorMsg.contains('models/gemini-2.0-flash is not found')) {
-        return '⚠️ Модель 2.0 Flash еще не доступна. Переключаюсь на 1.5-flash...';
+        return _modelUnavailableMessage(text);
       }
-      return '⚠️ Ошибка AI: $e';
+      return _errorMessage(text, e);
     }
   }
 
   /// Сбросить историю чата (новый сеанс с актуальными данными)
+  @override
   void resetChat(List<MedicineModel> medicines) {
     initWithMedicines(medicines);
+  }
+
+  String _notInitializedMessage(String text) {
+    switch (AiSafety.detectLanguage(text)) {
+      case AiResponseLanguage.russian:
+        return 'AI не инициализирован. Пожалуйста, подождите или перезапустите чат.';
+      case AiResponseLanguage.english:
+        return 'AI is not initialized. Please wait or restart the chat.';
+      case AiResponseLanguage.kazakh:
+        return 'AI іске қосылмаған. Күтіңіз немесе чатты қайта бастаңыз.';
+    }
+  }
+
+  String _emptyResponseMessage(String text) {
+    switch (AiSafety.detectLanguage(text)) {
+      case AiResponseLanguage.russian:
+        return 'Нет ответа от AI';
+      case AiResponseLanguage.english:
+        return 'No response from AI';
+      case AiResponseLanguage.kazakh:
+        return 'AI жауап бермеді';
+    }
+  }
+
+  String _modelUnavailableMessage(String text) {
+    switch (AiSafety.detectLanguage(text)) {
+      case AiResponseLanguage.russian:
+        return 'Модель 2.0 Flash еще не доступна. Переключаюсь на 1.5-flash...';
+      case AiResponseLanguage.english:
+        return 'The 2.0 Flash model is not available yet. Switching to 1.5-flash...';
+      case AiResponseLanguage.kazakh:
+        return '2.0 Flash моделі әзірге қолжетімсіз. 1.5-flash моделіне ауысамын...';
+    }
+  }
+
+  String _errorMessage(String text, Object error) {
+    switch (AiSafety.detectLanguage(text)) {
+      case AiResponseLanguage.russian:
+        return 'Ошибка AI: $error';
+      case AiResponseLanguage.english:
+        return 'AI error: $error';
+      case AiResponseLanguage.kazakh:
+        return 'AI қатесі: $error';
+    }
+  }
+
+  String _languageFallbackMessage(String text) {
+    switch (AiSafety.detectLanguage(text)) {
+      case AiResponseLanguage.russian:
+        return 'Не показываю ответ со смешанными языками. Переформулируйте запрос, и я отвечу строго на русском.';
+      case AiResponseLanguage.english:
+        return 'I will not show a mixed-language answer. Please rephrase the request, and I will answer strictly in English.';
+      case AiResponseLanguage.kazakh:
+        return 'Аралас тілдегі жауапты көрсетпеймін. Сұрауды қайта жазыңыз, мен тек қазақ тілінде жауап беремін.';
+    }
   }
 }

@@ -71,7 +71,7 @@ class CartProvider extends ChangeNotifier {
     final result = <String, dynamic>{};
     map.forEach((key, value) {
       if (value is Color) {
-        result[key] = {'_type': 'Color', 'value': value.value};
+        result[key] = {'_type': 'Color', 'value': value.toARGB32()};
       } else if (value is IconData) {
         result[key] = {'_type': 'IconData', 'codePoint': value.codePoint};
       } else if (value is DateTime) {
@@ -104,6 +104,26 @@ class CartProvider extends ChangeNotifier {
       existing['quantity'] = _quantityOf(existing) + quantity;
     } else {
       _items.add({...item, 'quantity': quantity});
+    }
+
+    _saveCart();
+    notifyListeners();
+  }
+
+  void addItems(Iterable<Map<String, dynamic>> items) {
+    for (final item in items) {
+      final quantity = _quantityOf(item);
+      final key = _itemKey(item);
+      final existingIndex = _items.indexWhere(
+        (cartItem) => _itemKey(cartItem) == key,
+      );
+
+      if (existingIndex >= 0) {
+        final existing = _items[existingIndex];
+        existing['quantity'] = _quantityOf(existing) + quantity;
+      } else {
+        _items.add({...item, 'quantity': quantity});
+      }
     }
 
     _saveCart();

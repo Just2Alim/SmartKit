@@ -2,10 +2,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/router/app_routes.dart';
 import '../../../core/services/ai_provider.dart';
 import '../../../core/services/ai_service_interface.dart';
+import '../../../core/state/cart_provider.dart';
+import '../../b2b/inventory/data/b2b_inventory_repository.dart';
+import '../../b2b/inventory/models/b2b_inventory_model.dart';
 import '../../medicine/data/medicine_repository.dart';
 import '../../medicine/models/medicine_model.dart';
+import '../../shop/utils/shop_product_mapper.dart';
+import '../domain/ai_kit_planner.dart';
 
 class AiChatScreen extends StatefulWidget {
   final String? mode;
@@ -21,12 +27,12 @@ class _AiChatScreenState extends State<AiChatScreen>
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final MedicineRepository _medicineRepository = MedicineRepository();
+  final B2BInventoryRepository _inventoryRepository = B2BInventoryRepository();
 
   List<MedicineModel> medicines = [];
   bool isLoadingMedicines = true;
   bool isAiTyping = false;
   AiService? _aiService;
-  bool _isLocalAi = false;
 
   final List<_ChatMessage> messages = [];
 
@@ -56,7 +62,6 @@ class _AiChatScreenState extends State<AiChatScreen>
       medicines = await _medicineRepository.getMedicinesByUser(user.uid).first;
     }
 
-    _isLocalAi = true;
     _aiService = await AiProvider.getService();
 
     // Инициализируем AI сервис с контекстом аптечки
@@ -82,7 +87,7 @@ class _AiChatScreenState extends State<AiChatScreen>
         break;
       default:
         text =
-            'Привет! Я SmartKit AI 🤖 — твой умный помощник по домашней аптечке.\n\nМогу:\n• Подсказать что принять при симптомах\n• Проверить аптечку (сроки, остатки)\n• Составить список для покупок\n• Ответить на вопросы о лекарствах\n\nЧем могу помочь?';
+            'Привет! Я SmartKit AI 🤖 — твой умный помощник по домашней аптечке.\n\nМогу:\n• Проверить аптечку и сроки\n• Подсказать безопасные следующие шаги при симптомах\n• Собрать базовый набор и создать корзину после подтверждения\n• Ответить на вопросы о хранении лекарств\n\nЧем могу помочь?';
     }
     messages.add(_ChatMessage(text: text, isUser: false));
   }
@@ -99,16 +104,116 @@ class _AiChatScreenState extends State<AiChatScreen>
 
     _scrollToBottom();
 
-    final response = await (_aiService?.sendMessage(text) ?? 
-        Future.value("Ошибка: AI сервис не инициализирован"));
+    String response;
+    AiKitPlan? kitPlan;
+
+    if (AiKitPlanner.hasKitIntent(text)) {
+      final catalog = await _loadCatalogForKit();
+      final preferences = AiKitPlanner.preferencesFromText(text);
+      kitPlan = AiKitPlanner.buildPlan(
+        preferences: preferences,
+        catalog: catalog,
+        homeMedicines: medicines,
+      );
+      response = AiKitPlanner.chatSummary(kitPlan, userText: text);
+    } else {
+      response =
+          await (_aiService?.sendMessage(text) ??
+              Future.value('Ошибка: AI сервис не инициализирован'));
+    }
 
     if (mounted) {
       setState(() {
-        messages.add(_ChatMessage(text: response, isUser: false));
+        messages.add(
+          _ChatMessage(text: response, isUser: false, kitPlan: kitPlan),
+        );
         isAiTyping = false;
       });
       Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
     }
+  }
+
+  Future<List<B2BInventoryModel>> _loadCatalogForKit() async {
+    try {
+      return await _inventoryRepository.getPublicCatalogItems().first.timeout(
+        const Duration(seconds: 8),
+      );
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  int _quantityInCart(String productId) {
+    return CartProvider.instance.items
+        .where((item) => item['id'] == productId)
+        .fold<int>(
+          0,
+          (sum, item) => sum + ((item['quantity'] as num?)?.toInt() ?? 1),
+        );
+  }
+
+  Future<void> _confirmKitCart(AiKitPlan plan) async {
+    final purchasable = plan.purchasableItems;
+    if (purchasable.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Нет доступных товаров для автоматической корзины'),
+        ),
+      );
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Создать корзину?'),
+            content: Text(
+              'Добавить ${purchasable.length} позиций на сумму '
+              '${ShopProductMapper.formatPrice(plan.estimatedTotal)}. '
+              'Перед применением проверьте инструкцию и противопоказания.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Отмена'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Добавить'),
+              ),
+            ],
+          ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    final cartItems = <Map<String, dynamic>>[];
+    for (final item in purchasable) {
+      final product = item.product!;
+      final inCart = _quantityInCart(product.id);
+      if (inCart + item.quantity > product.stock) continue;
+
+      final map = ShopProductMapper.toProductMap(product);
+      map['quantity'] = item.quantity;
+      map['source'] = 'ai_chat_kit';
+      cartItems.add(map);
+    }
+
+    if (cartItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Все выбранные товары уже в корзине')),
+      );
+      return;
+    }
+
+    CartProvider.instance.addItems(cartItems);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Корзина собрана')));
+    Navigator.pushNamed(context, AppRoutes.cart);
   }
 
   void _scrollToBottom() {
@@ -128,30 +233,6 @@ class _AiChatScreenState extends State<AiChatScreen>
     _aiService?.resetChat(medicines);
     _addInitialMessage();
     setState(() {});
-  }
-
-  void _showAiSettings() {
-    // We only have Ollama now, so we can just show a simple info dialog if needed,
-    // or nothing at all. The user requested to remove Gemini completely.
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('SmartKit AI'),
-        content: const Text('Ваш помощник работает локально через Ollama для обеспечения максимальной приватности.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Понятно'),
-          ),
-        ],
-      ),
-    );
-  }
-
-
-  Future<void> _updateAiService() async {
-    _aiService = await AiProvider.getService();
-    _aiService?.initWithMedicines(medicines);
   }
 
   List<String> get _quickPrompts {
@@ -175,7 +256,7 @@ class _AiChatScreenState extends State<AiChatScreen>
           'Проверь аптечку',
           'Что принять от головной боли?',
           'Что докупить?',
-          'Собери базовый набор',
+          'Собери базовый набор в корзину',
         ];
     }
   }
@@ -214,18 +295,17 @@ class _AiChatScreenState extends State<AiChatScreen>
                   'SmartKit AI',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                 ),
-                  Text(
-                    isAiTyping 
-                        ? 'печатает...' 
-                        : 'онлайн • Ollama (Локально)',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isAiTyping
-                          ? const Color(0xFFA855F7)
-                          : const Color(0xFF10B981),
-                      fontWeight: FontWeight.w500,
-                    ),
+                Text(
+                  isAiTyping ? 'печатает...' : 'готов • локальный режим',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color:
+                        isAiTyping
+                            ? const Color(0xFFA855F7)
+                            : const Color(0xFF10B981),
+                    fontWeight: FontWeight.w500,
                   ),
+                ),
               ],
             ),
           ],
@@ -239,16 +319,17 @@ class _AiChatScreenState extends State<AiChatScreen>
         ],
       ),
       body: SafeArea(
-        child: isLoadingMedicines
-            ? _buildLoading()
-            : Column(
-                children: [
-                  Expanded(child: _buildMessageList(isDark)),
-                  if (isAiTyping) _buildTypingIndicator(isDark),
-                  _buildQuickPrompts(isDark),
-                  _buildInputBar(isDark),
-                ],
-              ),
+        child:
+            isLoadingMedicines
+                ? _buildLoading()
+                : Column(
+                  children: [
+                    Expanded(child: _buildMessageList(isDark)),
+                    if (isAiTyping) _buildTypingIndicator(isDark),
+                    _buildQuickPrompts(isDark),
+                    _buildInputBar(isDark),
+                  ],
+                ),
       ),
     );
   }
@@ -303,16 +384,18 @@ class _AiChatScreenState extends State<AiChatScreen>
           ),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            gradient: isUser
-                ? const LinearGradient(
-                    colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  )
-                : null,
-            color: isUser
-                ? null
-                : (isDark ? const Color(0xFF1F2937) : Colors.white),
+            gradient:
+                isUser
+                    ? const LinearGradient(
+                      colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                    : null,
+            color:
+                isUser
+                    ? null
+                    : (isDark ? const Color(0xFF1F2937) : Colors.white),
             borderRadius: BorderRadius.only(
               topLeft: const Radius.circular(20),
               topRight: const Radius.circular(20),
@@ -323,21 +406,47 @@ class _AiChatScreenState extends State<AiChatScreen>
               BoxShadow(
                 blurRadius: 8,
                 offset: const Offset(0, 2),
-                color: isUser
-                    ? const Color(0xFF6366F1).withOpacity(0.3)
-                    : Colors.black.withOpacity(0.05),
+                color:
+                    isUser
+                        ? const Color(0xFF6366F1).withValues(alpha: 0.3)
+                        : Colors.black.withValues(alpha: 0.05),
               ),
             ],
           ),
-          child: Text(
-            message.text,
-            style: TextStyle(
-              fontSize: 14.5,
-              height: 1.45,
-              color: isUser
-                  ? Colors.white
-                  : (isDark ? const Color(0xFFE5E7EB) : const Color(0xFF111827)),
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                message.text,
+                style: TextStyle(
+                  fontSize: 14.5,
+                  height: 1.45,
+                  color:
+                      isUser
+                          ? Colors.white
+                          : (isDark
+                              ? const Color(0xFFE5E7EB)
+                              : const Color(0xFF111827)),
+                ),
+              ),
+              if (!isUser &&
+                  message.kitPlan != null &&
+                  message.kitPlan!.purchasableItems.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () => _confirmKitCart(message.kitPlan!),
+                    icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
+                    label: Text(
+                      'Подтвердить корзину • ${ShopProductMapper.formatPrice(message.kitPlan!.estimatedTotal)}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),
@@ -362,7 +471,7 @@ class _AiChatScreenState extends State<AiChatScreen>
             BoxShadow(
               blurRadius: 8,
               offset: const Offset(0, 2),
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
             ),
           ],
         ),
@@ -373,7 +482,10 @@ class _AiChatScreenState extends State<AiChatScreen>
               animation: _typingAnimController,
               builder: (_, __) {
                 final delay = i * 0.2;
-                final value = (_typingAnimController.value - delay).clamp(0.0, 1.0);
+                final value = (_typingAnimController.value - delay).clamp(
+                  0.0,
+                  1.0,
+                );
                 return Container(
                   width: 7,
                   height: 7,
@@ -401,46 +513,52 @@ class _AiChatScreenState extends State<AiChatScreen>
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
-          children: _quickPrompts.map((prompt) {
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: isAiTyping ? null : () => _sendMessage(prompt),
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: isAiTyping
-                            ? const Color(0xFFD1D5DB)
-                            : const Color(0xFFA855F7),
-                        width: 1.5,
-                      ),
+          children:
+              _quickPrompts.map((prompt) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: isAiTyping ? null : () => _sendMessage(prompt),
                       borderRadius: BorderRadius.circular(20),
-                      color: isAiTyping
-                          ? Colors.transparent
-                          : const Color(0xFFA855F7).withOpacity(0.08),
-                    ),
-                    child: Text(
-                      prompt,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: isAiTyping
-                            ? const Color(0xFF9CA3AF)
-                            : const Color(0xFFA855F7),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color:
+                                isAiTyping
+                                    ? const Color(0xFFD1D5DB)
+                                    : const Color(0xFFA855F7),
+                            width: 1.5,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          color:
+                              isAiTyping
+                                  ? Colors.transparent
+                                  : const Color(
+                                    0xFFA855F7,
+                                  ).withValues(alpha: 0.08),
+                        ),
+                        child: Text(
+                          prompt,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color:
+                                isAiTyping
+                                    ? const Color(0xFF9CA3AF)
+                                    : const Color(0xFFA855F7),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
-            );
-          }).toList(),
+                );
+              }).toList(),
         ),
       ),
     );
@@ -455,7 +573,7 @@ class _AiChatScreenState extends State<AiChatScreen>
           BoxShadow(
             blurRadius: 20,
             offset: const Offset(0, -4),
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
           ),
         ],
       ),
@@ -476,9 +594,8 @@ class _AiChatScreenState extends State<AiChatScreen>
                   borderSide: BorderSide.none,
                 ),
                 filled: true,
-                fillColor: isDark
-                    ? const Color(0xFF111827)
-                    : const Color(0xFFF3F4F6),
+                fillColor:
+                    isDark ? const Color(0xFF111827) : const Color(0xFFF3F4F6),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 12,
@@ -493,25 +610,27 @@ class _AiChatScreenState extends State<AiChatScreen>
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              gradient: isAiTyping
-                  ? const LinearGradient(
-                      colors: [Color(0xFFD1D5DB), Color(0xFFD1D5DB)],
-                    )
-                  : const LinearGradient(
-                      colors: [Color(0xFFA855F7), Color(0xFFEC4899)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: isAiTyping
-                  ? []
-                  : [
-                      BoxShadow(
-                        color: const Color(0xFFA855F7).withOpacity(0.4),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
+              gradient:
+                  isAiTyping
+                      ? const LinearGradient(
+                        colors: [Color(0xFFD1D5DB), Color(0xFFD1D5DB)],
+                      )
+                      : const LinearGradient(
+                        colors: [Color(0xFFA855F7), Color(0xFFEC4899)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                    ],
+              borderRadius: BorderRadius.circular(16),
+              boxShadow:
+                  isAiTyping
+                      ? []
+                      : [
+                        BoxShadow(
+                          color: const Color(0xFFA855F7).withValues(alpha: 0.4),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
             ),
             child: Material(
               color: Colors.transparent,
@@ -535,10 +654,9 @@ class _AiChatScreenState extends State<AiChatScreen>
 class _ChatMessage {
   final String text;
   final bool isUser;
+  final AiKitPlan? kitPlan;
   final DateTime timestamp;
 
-  _ChatMessage({
-    required this.text,
-    required this.isUser,
-  }) : timestamp = DateTime.now();
+  _ChatMessage({required this.text, required this.isUser, this.kitPlan})
+    : timestamp = DateTime.now();
 }

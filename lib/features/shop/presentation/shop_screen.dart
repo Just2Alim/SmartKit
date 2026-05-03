@@ -4,6 +4,7 @@ import '../../../core/router/app_routes.dart';
 import '../../../core/state/cart_provider.dart';
 import '../../b2b/inventory/data/b2b_inventory_repository.dart';
 import '../../b2b/inventory/models/b2b_inventory_model.dart';
+import '../utils/shop_product_mapper.dart';
 
 class ShopScreen extends StatefulWidget {
   const ShopScreen({super.key});
@@ -24,62 +25,6 @@ class _ShopScreenState extends State<ShopScreen> {
     super.dispose();
   }
 
-  String _formatPrice(int value) {
-    final text = value.toString();
-    final buffer = StringBuffer();
-    int counter = 0;
-
-    for (int i = text.length - 1; i >= 0; i--) {
-      buffer.write(text[i]);
-      counter++;
-      if (counter % 3 == 0 && i != 0) {
-        buffer.write(' ');
-      }
-    }
-
-    return '${buffer.toString().split('').reversed.join()} ₸';
-  }
-
-  Color _categoryColor(String category) {
-    final lower = category.toLowerCase();
-    if (lower.contains('витамин')) {
-      return const Color(0xFFF59E0B);
-    }
-    if (lower.contains('антибиот')) {
-      return const Color(0xFFEF4444);
-    }
-    if (lower.contains('жкт') || lower.contains('сорб')) {
-      return const Color(0xFF3B82F6);
-    }
-    if (lower.contains('аллер')) {
-      return const Color(0xFF8B5CF6);
-    }
-    if (lower.contains('антисеп')) {
-      return const Color(0xFF06B6D4);
-    }
-    return const Color(0xFF10B981);
-  }
-
-  IconData _categoryIcon(String category) {
-    final lower = category.toLowerCase();
-    if (lower.contains('витамин')) {
-      return Icons.bolt_rounded;
-    }
-    if (lower.contains('антисеп')) {
-      return Icons.sanitizer_rounded;
-    }
-    if (lower.contains('аллер')) {
-      return Icons.air_rounded;
-    }
-    if (lower.contains('жкт') || lower.contains('сорб')) {
-      return Icons.spa_rounded;
-    }
-    if (lower.contains('серд')) {
-      return Icons.favorite_rounded;
-    }
-    return Icons.medication_rounded;
-  }
-
   List<B2BInventoryModel> _filterProducts(List<B2BInventoryModel> products) {
     final query = _searchController.text.trim().toLowerCase();
     return products.where((product) {
@@ -98,48 +43,7 @@ class _ShopScreenState extends State<ShopScreen> {
   }
 
   Map<String, dynamic> _productMap(B2BInventoryModel product) {
-    final color = _categoryColor(product.category);
-    final subtitle = [
-      product.category,
-      if ((product.dosage ?? '').isNotEmpty) product.dosage!,
-      if ((product.packageSize ?? '').isNotEmpty) product.packageSize!,
-    ].join(' • ');
-
-    return {
-      'id': product.id,
-      'title': product.name,
-      'subtitle': subtitle,
-      'price': _formatPrice(product.price),
-      'icon': _categoryIcon(product.category),
-      'color': color.withOpacity(0.12),
-      'iconColor': color,
-      'description': product.description,
-      'manufacturer': product.manufacturer,
-      'dosage': product.dosage,
-      'packageSize': product.packageSize,
-      'stock': product.stock,
-      'maxStock': product.stock,
-      'expiryDate': product.expiryDate?.toIso8601String(),
-      'b2b_item': {
-        'id': product.id,
-        'userId': product.userId,
-        'name': product.name,
-        'category': product.category,
-        'description': product.description,
-        'manufacturer': product.manufacturer,
-        'barcode': product.barcode,
-        'batchNumber': product.batchNumber,
-        'dosage': product.dosage,
-        'packageSize': product.packageSize,
-        'stock': product.stock,
-        'minStock': product.minStock,
-        'price': product.price,
-        'locationId': product.locationId,
-        'expiryDate': product.expiryDate?.toIso8601String(),
-        'createdAt': product.createdAt.toIso8601String(),
-        'updatedAt': product.updatedAt?.toIso8601String(),
-      },
-    };
+    return ShopProductMapper.toProductMap(product);
   }
 
   void _addToCart(BuildContext context, B2BInventoryModel product) {
@@ -373,7 +277,7 @@ class _ShopScreenState extends State<ShopScreen> {
   }
 
   Widget _productCard(BuildContext context, B2BInventoryModel product) {
-    final color = _categoryColor(product.category);
+    final color = ShopProductMapper.categoryColor(product.category);
     final lowStock = product.stock <= product.minStock;
 
     return Material(
@@ -420,7 +324,10 @@ class _ShopScreenState extends State<ShopScreen> {
                       color: color.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(17),
                     ),
-                    child: Icon(_categoryIcon(product.category), color: color),
+                    child: Icon(
+                      ShopProductMapper.categoryIcon(product.category),
+                      color: color,
+                    ),
                   ),
                   const Spacer(),
                   Container(
@@ -493,7 +400,7 @@ class _ShopScreenState extends State<ShopScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      _formatPrice(product.price),
+                      ShopProductMapper.formatPrice(product.price),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(

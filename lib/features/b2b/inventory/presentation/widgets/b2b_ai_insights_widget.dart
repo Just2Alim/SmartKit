@@ -31,19 +31,28 @@ class _B2BAiInsightsWidgetState extends State<B2BAiInsightsWidget> {
     });
 
     try {
-      B2BAiService.instance.init(widget.inventory, widget.sales, widget.locations);
+      B2BAiService.instance.init(
+        widget.inventory,
+        widget.sales,
+        widget.locations,
+      );
       final result = await B2BAiService.instance.getQuickBusinessAnalysis();
+      if (!mounted) return;
       setState(() {
         _analysis = result;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _analysis = 'Ошибка при анализе: $e';
+        _analysis =
+            'AI-аналитика временно недоступна. Проверьте остатки, сроки годности и продажи вручную.';
       });
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -90,7 +99,9 @@ class _B2BAiInsightsWidgetState extends State<B2BAiInsightsWidget> {
                       decoration: BoxDecoration(
                         color: const Color(0xFF10B981).withOpacity(0.15),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                        border: Border.all(
+                          color: const Color(0xFF10B981).withOpacity(0.3),
+                        ),
                       ),
                       child: const Icon(
                         Icons.auto_awesome_rounded,
@@ -125,7 +136,11 @@ class _B2BAiInsightsWidgetState extends State<B2BAiInsightsWidget> {
                     if (_analysis != null && !_isLoading)
                       IconButton(
                         onPressed: _runAnalysis,
-                        icon: const Icon(Icons.refresh_rounded, color: Colors.white54, size: 20),
+                        icon: const Icon(
+                          Icons.refresh_rounded,
+                          color: Colors.white54,
+                          size: 20,
+                        ),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),
@@ -152,11 +167,7 @@ class _B2BAiInsightsWidgetState extends State<B2BAiInsightsWidget> {
       children: [
         const Text(
           'Готов провести глубокий анализ текущих остатков и динамики продаж.',
-          style: TextStyle(
-            color: Colors.white70,
-            fontSize: 14,
-            height: 1.5,
-          ),
+          style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
         ),
         const SizedBox(height: 20),
         SizedBox(

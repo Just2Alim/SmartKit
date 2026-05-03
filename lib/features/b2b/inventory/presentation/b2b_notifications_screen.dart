@@ -41,15 +41,18 @@ class _B2BNotificationsScreenState extends State<B2BNotificationsScreen> {
       final result = await B2BAiService.instance.sendMessage(
         'Проанализируй эти данные и дай ОДНО самое важное предупреждение или совет для бизнеса на сегодня. Будь максимально краток (1-2 предложения).',
       );
+      if (!mounted) return;
       setState(() {
         _aiAlert = result;
       });
     } catch (e) {
       // Игнорируем ошибки ИИ в уведомлениях, чтобы не мешать основному флоу
     } finally {
-      setState(() {
-        _isLoadingAi = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoadingAi = false;
+        });
+      }
     }
   }
 
