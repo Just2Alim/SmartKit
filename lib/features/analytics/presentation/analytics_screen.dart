@@ -5,12 +5,15 @@ import '../../family/data/family_repository.dart';
 import '../../family/models/family_member_model.dart';
 import '../../medicine/data/medicine_repository.dart';
 import '../../medicine/models/medicine_model.dart';
+import '../../b2b/inventory/data/b2b_inventory_repository.dart';
+import '../../b2b/inventory/models/b2b_inventory_model.dart';
 
 class AnalyticsScreen extends StatelessWidget {
   AnalyticsScreen({super.key});
 
   final MedicineRepository _medicineRepository = MedicineRepository();
   final FamilyRepository _familyRepository = FamilyRepository();
+  final B2BInventoryRepository _b2bRepository = B2BInventoryRepository();
 
   int _countExpiring(List<MedicineModel> medicines) {
     final now = DateTime.now();
@@ -57,26 +60,47 @@ class AnalyticsScreen extends StatelessWidget {
               : StreamBuilder<List<MedicineModel>>(
                 stream: _medicineRepository.getMedicinesByUser(user.uid),
                 builder: (context, medicineSnapshot) {
-                  if (medicineSnapshot.connectionState ==
-                      ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
+                  return StreamBuilder<List<B2BInventoryModel>>(
+                    stream: _b2bRepository.getItemsByUser(user.uid),
+                    builder: (context, b2bSnapshot) {
+                      if (medicineSnapshot.connectionState ==
+                              ConnectionState.waiting ||
+                          b2bSnapshot.connectionState ==
+                              ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
 
-                  if (medicineSnapshot.hasError) {
-                    return Center(
-                      child: Text('Ошибка: ${medicineSnapshot.error}'),
-                    );
-                  }
+                      if (medicineSnapshot.hasError || b2bSnapshot.hasError) {
+                        return Center(
+                          child: Text(
+                              'Ошибка: ${medicineSnapshot.error ?? b2bSnapshot.error}'),
+                        );
+                      }
 
-                  final medicines = medicineSnapshot.data ?? [];
-                  final categoryStats = _categoryStats(medicines);
-                  final expiringCount = _countExpiring(medicines);
-                  final lowStockCount = _countLowStock(medicines);
-                  final familyAssignedCount = _assignedToFamily(medicines);
+                      final medicines = medicineSnapshot.data ?? [];
+                      final b2bItems = b2bSnapshot.data ?? [];
 
-                  return StreamBuilder<List<FamilyMemberModel>>(
-                    stream: _familyRepository.getFamilyMembersByUser(user.uid),
-                    builder: (context, familySnapshot) {
+                      final totalItems = medicines.length + b2bItems.length;
+
+                      final categoryStats = _categoryStats(medicines);
+                      // Add B2B categories to stats
+                      for (final item in b2bItems) {
+                        categoryStats[item.category] =
+                            (categoryStats[item.category] ?? 0) + 1;
+                      }
+
+                      final expiringCount = _countExpiring(medicines);
+                      final lowStockCount =
+                          _countLowStock(medicines) +
+                          b2bItems.where((i) => i.stock <= 5).length;
+
+                      final familyAssignedCount = _assignedToFamily(medicines);
+
+                      return StreamBuilder<List<FamilyMemberModel>>(
+                        stream: _familyRepository.getFamilyMembersByUser(
+                          user.uid,
+                        ),
+                        builder: (context, familySnapshot) {
                       if (familySnapshot.connectionState ==
                           ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
@@ -167,7 +191,7 @@ class AnalyticsScreen extends StatelessWidget {
                                 Expanded(
                                   child: _statCard(
                                     title: 'Всего лекарств',
-                                    value: medicines.length.toString(),
+                                    value: totalItems.toString(),
                                     color1: const Color(0xFF60A5FA),
                                     color2: const Color(0xFF2563EB),
                                     icon: Icons.medication_rounded,
@@ -259,8 +283,20 @@ class AnalyticsScreen extends StatelessWidget {
                               )
                             else
                               _categoryChart(categoryStats),
+                            if (b2bItems.isNotEmpty) ...[
+                              const SizedBox(height: 24),
+                              _sectionTitle('B2B Инвентарь'),
+                              const SizedBox(height: 12),
+                              _infoCard(
+                                title: 'Позиций в B2B',
+                                value: b2bItems.length.toString(),
+                                icon: Icons.business_center_rounded,
+                              ),
+                            ],
                           ],
                         ),
+                          );
+                        },
                       );
                     },
                   );

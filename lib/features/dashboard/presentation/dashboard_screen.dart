@@ -4,6 +4,8 @@ import '../../family/data/family_repository.dart';
 import '../../family/models/family_member_model.dart';
 import '../../medicine/data/medicine_repository.dart';
 import '../../medicine/models/medicine_model.dart';
+import '../../b2b/inventory/data/b2b_inventory_repository.dart';
+import '../../b2b/inventory/models/b2b_inventory_model.dart';
 import '../../../core/router/app_routes.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/models/app_user.dart';
@@ -17,6 +19,7 @@ class DashboardScreen extends StatelessWidget {
   final MedicineRepository _medicineRepository = MedicineRepository();
   final FamilyRepository _familyRepository = FamilyRepository();
   final ReminderRepository _reminderRepository = ReminderRepository();
+  final B2BInventoryRepository _b2bRepository = B2BInventoryRepository();
 
   @override
   Widget build(BuildContext context) {
@@ -202,94 +205,104 @@ class DashboardScreen extends StatelessWidget {
     return StreamBuilder<List<MedicineModel>>(
       stream: _medicineRepository.getMedicinesByUser(user.uid),
       builder: (context, medicineSnapshot) {
-        if (medicineSnapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        final medicines = medicineSnapshot.data ?? [];
-
-        final expiringCount =
-            medicines.where((medicine) {
-              if (medicine.expiryDate == null) return false;
-              final diff =
-                  medicine.expiryDate!.difference(DateTime.now()).inDays;
-              return diff >= 0 && diff <= 30;
-            }).length;
-
-        final lowStockCount =
-            medicines.where((medicine) {
-              return medicine.quantity <= 5;
-            }).length;
-
-        final notificationsCount = expiringCount + lowStockCount;
-
-        return StreamBuilder<List<FamilyMemberModel>>(
-          stream: _familyRepository.getFamilyMembersByUser(user.uid),
-          builder: (context, familySnapshot) {
-            if (familySnapshot.connectionState == ConnectionState.waiting) {
+        return StreamBuilder<List<B2BInventoryModel>>(
+          stream: _b2bRepository.getItemsByUser(user.uid),
+          builder: (context, b2bSnapshot) {
+            if (medicineSnapshot.connectionState == ConnectionState.waiting ||
+                b2bSnapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
 
-            final familyMembers = familySnapshot.data ?? [];
+            final medicines = medicineSnapshot.data ?? [];
+            final b2bItems = b2bSnapshot.data ?? [];
 
-            return Column(
-              children: [
-                Row(
+            final totalItemsCount = medicines.length + b2bItems.length;
+
+            final expiringCount =
+                medicines.where((medicine) {
+                  if (medicine.expiryDate == null) return false;
+                  final diff =
+                      medicine.expiryDate!.difference(DateTime.now()).inDays;
+                  return diff >= 0 && diff <= 30;
+                }).length;
+
+            final lowStockCount =
+                medicines.where((medicine) {
+                  return medicine.quantity <= 5;
+                }).length +
+                b2bItems.where((item) => item.stock <= 5).length;
+
+            final notificationsCount = expiringCount + lowStockCount;
+
+            return StreamBuilder<List<FamilyMemberModel>>(
+              stream: _familyRepository.getFamilyMembersByUser(user.uid),
+              builder: (context, familySnapshot) {
+                if (familySnapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final familyMembers = familySnapshot.data ?? [];
+
+                return Column(
                   children: [
-                    Expanded(
-                      child: _statCard(
-                        context: context,
-                        title: 'Лекарства',
-                        value: medicines.length.toString(),
-                        subtitle: 'в аптечке',
-                        colors: const [Color(0xFF60A5FA), Color(0xFF2563EB)],
-                        icon: Icons.medication_rounded,
-                        onTap: () => Navigator.pushNamed(context, AppRoutes.search),
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _statCard(
+                            context: context,
+                            title: 'Лекарства',
+                            value: totalItemsCount.toString(),
+                            subtitle: 'всего позиций',
+                            colors: const [Color(0xFF60A5FA), Color(0xFF2563EB)],
+                            icon: Icons.medication_rounded,
+                            onTap: () => Navigator.pushNamed(context, AppRoutes.search),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _statCard(
+                            context: context,
+                            title: 'Уведомления',
+                            value: notificationsCount.toString(),
+                            subtitle: 'важных',
+                            colors: const [Color(0xFFA78BFA), Color(0xFF7C3AED)],
+                            icon: Icons.notifications_active_rounded,
+                            onTap: () => Navigator.pushNamed(context, AppRoutes.notifications),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _statCard(
-                        context: context,
-                        title: 'Уведомления',
-                        value: notificationsCount.toString(),
-                        subtitle: 'важных',
-                        colors: const [Color(0xFFA78BFA), Color(0xFF7C3AED)],
-                        icon: Icons.notifications_active_rounded,
-                        onTap: () => Navigator.pushNamed(context, AppRoutes.notifications),
-                      ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _statCard(
+                            context: context,
+                            title: 'Семья',
+                            value: familyMembers.length.toString(),
+                            subtitle: 'профилей',
+                            colors: const [Color(0xFF34D399), Color(0xFF059669)],
+                            icon: Icons.group_rounded,
+                            onTap: () => Navigator.pushNamed(context, AppRoutes.family),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _statCard(
+                            context: context,
+                            title: 'Мало остатка',
+                            value: lowStockCount.toString(),
+                            subtitle: 'лекарств',
+                            colors: const [Color(0xFFF59E0B), Color(0xFFEA580C)],
+                            icon: Icons.inventory_2_outlined,
+                            onTap: () => Navigator.pushNamed(context, AppRoutes.search),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _statCard(
-                        context: context,
-                        title: 'Семья',
-                        value: familyMembers.length.toString(),
-                        subtitle: 'профилей',
-                        colors: const [Color(0xFF34D399), Color(0xFF059669)],
-                        icon: Icons.group_rounded,
-                        onTap: () => Navigator.pushNamed(context, AppRoutes.family),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _statCard(
-                        context: context,
-                        title: 'Мало остатка',
-                        value: lowStockCount.toString(),
-                        subtitle: 'лекарств',
-                        colors: const [Color(0xFFF59E0B), Color(0xFFEA580C)],
-                        icon: Icons.inventory_2_outlined,
-                        onTap: () => Navigator.pushNamed(context, AppRoutes.search),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                );
+              },
             );
           },
         );
@@ -563,31 +576,41 @@ class DashboardScreen extends StatelessWidget {
 
     return StreamBuilder<List<MedicineModel>>(
       stream: _medicineRepository.getMedicinesByUser(user.uid),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+      builder: (context, medicineSnapshot) {
+        return StreamBuilder<List<B2BInventoryModel>>(
+          stream: _b2bRepository.getItemsByUser(user.uid),
+          builder: (context, b2bSnapshot) {
+            if (medicineSnapshot.connectionState == ConnectionState.waiting ||
+                b2bSnapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-        if (snapshot.hasError) {
-          return Text('Ошибка: ${snapshot.error}');
-        }
+            if (medicineSnapshot.hasError || b2bSnapshot.hasError) {
+              return Text('Ошибка: ${medicineSnapshot.error ?? b2bSnapshot.error}');
+            }
 
-        final medicines = snapshot.data ?? [];
-        final now = DateTime.now();
+            final medicines = medicineSnapshot.data ?? [];
+            final b2bItems = b2bSnapshot.data ?? [];
+            final now = DateTime.now();
 
-        final expiringMedicines =
-            medicines.where((medicine) {
-              if (medicine.expiryDate == null) return false;
-              final diff = medicine.expiryDate!.difference(now).inDays;
-              return diff >= 0 && diff <= 30;
-            }).toList();
+            final expiringMedicines =
+                medicines.where((medicine) {
+                  if (medicine.expiryDate == null) return false;
+                  final diff = medicine.expiryDate!.difference(now).inDays;
+                  return diff >= 0 && diff <= 30;
+                }).toList();
 
-        final lowStockMedicines =
-            medicines.where((medicine) {
-              return medicine.quantity <= 5;
-            }).toList();
+            final lowStockMedicines =
+                medicines.where((medicine) {
+                  return medicine.quantity <= 5;
+                }).toList();
 
-        if (expiringMedicines.isEmpty && lowStockMedicines.isEmpty) {
+            final b2bLowStock =
+                b2bItems.where((item) => item.stock <= 5).toList();
+
+            if (expiringMedicines.isEmpty &&
+                lowStockMedicines.isEmpty &&
+                b2bLowStock.isEmpty) {
           return Container(
             width: double.infinity,
             padding: const EdgeInsets.all(18),
@@ -652,6 +675,26 @@ class DashboardScreen extends StatelessWidget {
           );
         }
 
+        if (b2bLowStock.isNotEmpty) {
+          final item = b2bLowStock.first;
+
+          cards.add(
+            _todayCard(
+              context: context,
+              title: item.name,
+              subtitle: 'B2B: Осталось ${item.stock} шт',
+              badge: 'B2B',
+              badgeColor: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF064E3B).withOpacity(0.3)
+                  : const Color(0xFFD1FAE5),
+              badgeTextColor: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF10B981)
+                  : const Color(0xFF059669),
+              icon: Icons.business_center_rounded,
+            ),
+          );
+        }
+
         return Column(
           children: [
             for (int i = 0; i < cards.length; i++) ...[
@@ -661,8 +704,10 @@ class DashboardScreen extends StatelessWidget {
           ],
         );
       },
-    );
-  }
+      );
+    },
+  );
+}
 
   Widget _todayCard({
     required BuildContext context,

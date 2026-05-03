@@ -21,6 +21,7 @@
 - [x] **B2B Product Operations**: Added unified add/edit product flow, OCR autofill, quick stock receipt, and richer product metadata for reports and shop display.
 - [x] **Empty-State Stability**: Fixed B2B add/report flows so empty locations, sales, or inventory no longer cause infinite loading.
 - [x] **Unified Theme & Dark Mode Pass**: Added shared theme tokens, reusable UI primitives, and dark-mode-safe surfaces across core B2B and shop flows.
+- [x] **Analytics Data Consistency**: Resolved the "missing products" issue by normalizing category naming (casing/whitespace) in aggregation logic and instrumenting streams for verification.
 - [ ] **Activity Detail/Navigation**: Add a dedicated screen to view the full history of activities, including filtering by type.
 
 ## Completed Work

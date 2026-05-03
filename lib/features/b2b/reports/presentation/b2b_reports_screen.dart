@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:smartkit/features/b2b/inventory/data/b2b_sales_repository.dart';
 import 'package:smartkit/features/b2b/inventory/models/b2b_sale_model.dart';
 import 'package:smartkit/features/b2b/inventory/presentation/widgets/b2b_ai_insights_widget.dart';
@@ -71,7 +72,24 @@ class B2BReportsScreen extends StatelessWidget {
   Map<String, int> _categoryStats(List<B2BInventoryModel> items) {
     final result = <String, int>{};
     for (final item in items) {
-      result[item.category] = (result[item.category] ?? 0) + item.stock;
+      final raw = item.category.trim();
+      final category = raw.isEmpty
+          ? 'Прочее'
+          : raw[0].toUpperCase() + raw.substring(1).toLowerCase();
+      // Aggregating by product count instead of stock for better "visibility" of added items
+      result[category] = (result[category] ?? 0) + 1;
+    }
+    return result;
+  }
+
+  Map<String, int> _categoryStock(List<B2BInventoryModel> items) {
+    final result = <String, int>{};
+    for (final item in items) {
+      final raw = item.category.trim();
+      final category = raw.isEmpty
+          ? 'Прочее'
+          : raw[0].toUpperCase() + raw.substring(1).toLowerCase();
+      result[category] = (result[category] ?? 0) + item.stock;
     }
     return result;
   }
@@ -95,18 +113,46 @@ class B2BReportsScreen extends StatelessWidget {
         stream: _inventoryRepository.getItemsByUser(user.uid),
         initialData: const [],
         builder: (context, inventorySnapshot) {
+          if (inventorySnapshot.hasError) {
+            return Scaffold(body: Center(child: _errorCard('Ошибка загрузки склада: ${inventorySnapshot.error}')));
+          }
+          if (inventorySnapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          }
+
           return StreamBuilder<List<B2BSaleModel>>(
             stream: _salesRepository.getSalesByUser(user.uid),
-            initialData: const [],
             builder: (context, salesSnapshot) {
+              if (salesSnapshot.hasError) {
+                return Scaffold(body: Center(child: _errorCard('Ошибка загрузки продаж: ${salesSnapshot.error}')));
+              }
+              if (salesSnapshot.connectionState == ConnectionState.waiting) {
+                return const Scaffold(body: Center(child: CircularProgressIndicator()));
+              }
+
               return StreamBuilder<List<B2BLocationModel>>(
                 stream: _locationRepository.getLocationsByUser(user.uid),
-                initialData: const [],
                 builder: (context, locationsSnapshot) {
+                  if (locationsSnapshot.hasError) {
+                    return Scaffold(body: Center(child: _errorCard('Ошибка загрузки локаций: ${locationsSnapshot.error}')));
+                  }
+                  if (locationsSnapshot.connectionState == ConnectionState.waiting) {
+                    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                  }
+
                   final inventory = inventorySnapshot.data ?? [];
                   final sales = salesSnapshot.data ?? [];
                   final locations = locationsSnapshot.data ?? [];
                   final categoryStats = _categoryStats(inventory);
+
+                  debugPrint('--- B2B REPORTS SYNC DEBUG ---');
+                  debugPrint('Inventory snapshot: ${inventory.length} items');
+                  if (inventory.isNotEmpty) {
+                    debugPrint('First item: ${inventory.first.name}, UID: ${inventory.first.userId}, Category: ${inventory.first.category}');
+                  }
+                  debugPrint('Category Stats Map: $categoryStats');
+                  debugPrint('------------------------------');
+
                   final streamErrors = [
                     if (inventorySnapshot.hasError) 'товары',
                     if (salesSnapshot.hasError) 'продажи',
@@ -153,6 +199,8 @@ class B2BReportsScreen extends StatelessWidget {
                               else
                                 _categoryChart(context, categoryStats),
                               const SizedBox(height: 32),
+                              _buildRecentProducts(context, inventory),
+                              const SizedBox(height: 32),
                               _buildSalesPerformance(context, sales),
                               const SizedBox(height: 40),
                             ],
@@ -180,12 +228,12 @@ class B2BReportsScreen extends StatelessWidget {
       flexibleSpace: FlexibleSpaceBar(
         titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
         title: const Text(
-          'Отчёты и Аналитика',
+          'Аналитика Склада',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.w900,
-            fontSize: 20,
-            letterSpacing: 0,
+            fontSize: 22,
+            letterSpacing: -0.5,
           ),
         ),
         background: Stack(
@@ -385,12 +433,25 @@ class B2BReportsScreen extends StatelessWidget {
         stats.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
     final maxValue = entries.isEmpty ? 1 : entries.first.value;
-    if (maxValue <= 0) {
-      return _emptyCard(context, 'Остатки по категориям пока нулевые');
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(24),
+    
+    // We already check for categoryStats.isEmpty before calling this, 
+    // and now categories are based on item count, so maxValue will be > 0 
+    // if there are items.
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Товаров по категориям',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(28),
@@ -429,7 +490,7 @@ class B2BReportsScreen extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          '${entry.value} шт',
+                          '${entry.value} поз.',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w800,
@@ -477,9 +538,11 @@ class B2BReportsScreen extends StatelessWidget {
                 ),
               );
             }).toList(),
+        ),
       ),
-    );
-  }
+    ],
+  );
+}
 
   Color _getCategoryColor(String category) {
     final lower = category.toLowerCase();
@@ -711,6 +774,89 @@ class B2BReportsScreen extends StatelessWidget {
                 color: Color(0xFF92400E),
                 fontWeight: FontWeight.w800,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  Widget _buildRecentProducts(
+    BuildContext context,
+    List<B2BInventoryModel> items,
+  ) {
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    final recentItems =
+        List<B2BInventoryModel>.from(items)
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final displayItems = recentItems.take(5).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Недавно добавленные',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 16),
+        ...displayItems.map((item) => _productItem(context, item)),
+      ],
+    );
+  }
+
+  Widget _productItem(BuildContext context, B2BInventoryModel item) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B981).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.medication_outlined, color: Color(0xFF10B981)),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  '${item.category} • Остаток: ${item.stock} шт.',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            DateFormat('dd.MM').format(item.createdAt),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],

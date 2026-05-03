@@ -37,6 +37,13 @@ class B2BDashboardScreen extends StatelessWidget {
       body: StreamBuilder<List<B2BInventoryModel>>(
         stream: _inventoryRepository.getItemsByUser(user.uid),
         builder: (context, inventorySnapshot) {
+          if (inventorySnapshot.hasError) {
+            return Scaffold(body: Center(child: Text('Ошибка склада: ${inventorySnapshot.error}')));
+          }
+          if (inventorySnapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          }
+          
           final inventory = inventorySnapshot.data ?? [];
           final lowStock = _lowStockCount(inventory);
           final totalMeds = inventory.length;
@@ -44,16 +51,25 @@ class B2BDashboardScreen extends StatelessWidget {
           return StreamBuilder<List<B2BSaleModel>>(
             stream: _salesRepository.getSalesByUser(user.uid),
             builder: (context, salesSnapshot) {
+              if (salesSnapshot.connectionState == ConnectionState.waiting) {
+                return const Scaffold(body: Center(child: CircularProgressIndicator()));
+              }
               final sales = salesSnapshot.data ?? [];
 
               return StreamBuilder<List<B2BActivityModel>>(
                 stream: _activityRepository.getActivitiesByUser(user.uid),
                 builder: (context, activitySnapshot) {
+                  if (activitySnapshot.connectionState == ConnectionState.waiting) {
+                    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                  }
                   final activities = activitySnapshot.data ?? [];
 
                   return StreamBuilder<List<B2BLocationModel>>(
                     stream: _locationsRepository.getLocationsByUser(user.uid),
                     builder: (context, locationSnapshot) {
+                      if (locationSnapshot.connectionState == ConnectionState.waiting) {
+                        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                      }
                       final locations = locationSnapshot.data ?? [];
 
                       return CustomScrollView(
@@ -93,6 +109,8 @@ class B2BDashboardScreen extends StatelessWidget {
                                     context,
                                     inventory,
                                   ),
+                                  const SizedBox(height: 32),
+                                  _buildRecentInventory(context, inventory),
                                   const SizedBox(height: 32),
                                   _buildSectionHeader(
                                     context,
@@ -826,13 +844,19 @@ class B2BDashboardScreen extends StatelessWidget {
 
     final Map<String, int> categories = {};
     for (var item in inventory) {
-      categories[item.category] = (categories[item.category] ?? 0) + item.stock;
+      final raw = item.category.trim();
+      final category = raw.isEmpty
+          ? 'Прочее'
+          : raw[0].toUpperCase() + raw.substring(1).toLowerCase();
+      // Using product count instead of stock for better distribution visibility
+      categories[category] = (categories[category] ?? 0) + 1;
     }
 
-    final totalStock = inventory.fold(0, (sum, item) => sum + item.stock);
-    if (totalStock <= 0) return const SizedBox.shrink();
+    if (categories.isEmpty) return const SizedBox.shrink();
     final sortedCategories =
         categories.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+
+    final totalCount = categories.values.fold(0, (sum, val) => sum + val);
 
     final List<Color> colors = [
       const Color(0xFF10B981),
@@ -895,7 +919,7 @@ class B2BDashboardScreen extends StatelessWidget {
                           final index = entry.key;
                           final category = entry.value;
                           final percentage =
-                              (category.value / totalStock) * 100;
+                              (category.value / totalCount) * 100;
                           return PieChartSectionData(
                             color: colors[index % colors.length],
                             value: category.value.toDouble(),
@@ -1180,6 +1204,85 @@ class B2BDashboardScreen extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+  Widget _buildRecentInventory(
+    BuildContext context,
+    List<B2BInventoryModel> items,
+  ) {
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    final recentItems =
+        List<B2BInventoryModel>.from(items)
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final displayItems = recentItems.take(3).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(
+          context,
+          'Новые поступления',
+          () {
+            Navigator.pushNamed(context, AppRoutes.b2bInventory);
+          },
+          actionLabel: 'Весь склад',
+        ),
+        const SizedBox(height: 16),
+        ...displayItems.map((item) => _inventoryMiniCard(context, item)),
+      ],
+    );
+  }
+
+  Widget _inventoryMiniCard(BuildContext context, B2BInventoryModel item) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B981).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.medication_outlined, color: Color(0xFF10B981)),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                Text(
+                  '${item.category} • ${item.stock} шт.',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.5),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(
+            Icons.chevron_right_rounded,
+            color: Colors.white24,
+          ),
+        ],
+      ),
     );
   }
 }

@@ -4,7 +4,7 @@
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.22.0+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Firebase](https://img.shields.io/badge/Firebase-Auth%20%7C%20Firestore-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com)
-[![Gemini AI](https://img.shields.io/badge/AI-Powered%20by%20Gemini-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://deepmind.google/technologies/gemini/)
+[![Ollama AI](https://img.shields.io/badge/AI-Local%20Ollama-FC6404?style=for-the-badge&logo=ollama&logoColor=white)](https://ollama.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
 **SmartKit** is a premium, AI-driven mobile application designed to simplify medication management. From real-time barcode scanning to intelligent health assistance, SmartKit ensures you never miss a dose and always have the right information at your fingertips.
@@ -21,10 +21,16 @@
   3. **Local Database**: Optimized for popular medications (30+ built-in records).
 - **Damage Recovery**: Built-in logic for reporting missing items and manual entry fallback.
 
-### 🤖 Intelligent AI Assistant (Gemini)
+### 🏢 B2B Warehouse & Business Suite
+- **Inventory Management**: Professional inventory tracking with location-aware stock management.
+- **Unified Analytics**: Real-time reporting on sales, revenue, and stock levels, integrated directly into the main analytics dashboard.
+- **OCR Logistics**: MLKit-powered scanning for quick stock receipt and automated product entry.
+- **Smart Logistics**: Occupancy metrics and AI-driven spatial insights for warehouse optimization.
+
 - **Health Chat**: Ask about side effects, dosage, or interactions.
-- **Kit Builder**: Tell the AI your situation (e.g., "I'm going to the mountains for 3 days"), and it will suggest a custom First Aid kit.
-- **Smart Analysis**: Get personalized health recommendations based on your current medicine cabinet.
+- **Kit Builder**: Tell the AI your situation, and it will suggest a custom First Aid kit.
+- **Business Intelligence**: Local AI analysis of inventory trends and sales performance.
+- **Privacy First**: All AI processing happens locally via **Ollama**, ensuring your health and business data never leave the device.
 
 ### ⏰ Smart Reminders & Notifications
 - **Dose Tracking**: Never miss a medication with automated push notifications.
@@ -41,9 +47,9 @@
 
 - **Frontend**: [Flutter](https://flutter.dev) (Dart)
 - **Backend**: [Firebase](https://firebase.google.com) (Authentication, Cloud Firestore)
-- **AI**: [Google Gemini Pro API](https://ai.google.dev/)
-- **Scanning**: [mobile_scanner](https://pub.dev/packages/mobile_scanner)
-- **State Management**: Provider / ChangeNotifier
+- **Local AI**: [Ollama](https://ollama.com) (Llama 3)
+- **Scanning**: [mobile_scanner](https://pub.dev/packages/mobile_scanner) & MLKit OCR
+- **State Management**: Provider
 
 ---
 
@@ -102,9 +108,8 @@ lib/
 ---
 
 ## 🗺 Roadmap
-- [ ] Offline AI support (Local LLM via Ollama).
+- [x] Offline AI support (Local LLM via Ollama).
 - [ ] Advanced Drug-to-Drug interaction checker.
-- [ ] Family sharing features.
 - [ ] Integration with Apple Health / Google Fit.
 
 ---
