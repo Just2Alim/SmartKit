@@ -1,8 +1,19 @@
 import 'package:flutter/material.dart';
 import '../../../core/state/cart_provider.dart';
+import '../../b2b/inventory/data/b2b_inventory_repository.dart';
+import '../../b2b/inventory/data/b2b_sales_repository.dart';
+import '../../b2b/inventory/models/b2b_sale_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-class CartScreen extends StatelessWidget {
+class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
+
+  @override
+  State<CartScreen> createState() => _CartScreenState();
+}
+
+class _CartScreenState extends State<CartScreen> {
+  bool _isLoading = false;
 
   String _formatPrice(int value) {
     final text = value.toString();
@@ -18,6 +29,76 @@ class CartScreen extends StatelessWidget {
     }
 
     return '${buffer.toString().split('').reversed.join()} ₸';
+  }
+
+  Future<void> _processCheckout(BuildContext context) async {
+    setState(() => _isLoading = true);
+    
+    try {
+      final cartItems = CartProvider.instance.items;
+      final inventoryRepo = B2BInventoryRepository();
+      final salesRepo = B2BSalesRepository();
+      final userId = FirebaseAuth.instance.currentUser?.uid ?? 'test_user';
+
+      final List<Map<String, dynamic>> soldItems = [];
+
+      for (var item in cartItems) {
+        if (item.containsKey('b2b_item')) {
+          final b2bMap = item['b2b_item'] as Map<String, dynamic>;
+          final itemId = item['id'] as String;
+          final currentStock = b2bMap['stock'] as int;
+          
+          if (currentStock > 0) {
+            // Update stock
+            await inventoryRepo.updateStock(itemId, currentStock - 1);
+            
+            soldItems.add({
+              'id': itemId,
+              'name': item['title'],
+              'price': b2bMap['price'],
+              'quantity': 1,
+            });
+          }
+        } else {
+          // It's a static kit or other non-B2B item
+          soldItems.add({
+            'id': item['id'],
+            'name': item['title'],
+            'price': int.tryParse(item['price'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
+            'quantity': 1,
+          });
+        }
+      }
+
+      if (soldItems.isNotEmpty) {
+        // Record the sale
+        final sale = B2BSaleModel(
+          id: '', // Firestore will generate ID
+          userId: userId,
+          items: soldItems,
+          totalAmount: CartProvider.instance.totalPrice,
+          saleDate: DateTime.now(),
+        );
+        await salesRepo.recordSale(sale);
+      }
+
+      CartProvider.instance.clearCart();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Заказ успешно оформлен!')),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка при оформлении: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -52,16 +133,9 @@ class CartScreen extends StatelessWidget {
                             itemBuilder: (context, index) {
                               final item = cartItems[index];
                               
-                              // Handle Color and IconData from persistence (they might be stored as ints)
-                              final Color itemColor = item['color'] is int 
-                                  ? Color(item['color']) 
-                                  : (item['color'] as Color);
-                              final Color iconColor = item['iconColor'] is int 
-                                  ? Color(item['iconColor']) 
-                                  : (item['iconColor'] as Color);
-                              final IconData icon = item['icon'] is int 
-                                  ? IconData(item['icon'], fontFamily: 'MaterialIcons') 
-                                  : (item['icon'] as IconData);
+                              final Color itemColor = item['color'] as Color;
+                              final Color iconColor = item['iconColor'] as Color;
+                              final IconData icon = item['icon'] as IconData;
 
                               return Container(
                                 padding: const EdgeInsets.all(18),
@@ -82,7 +156,7 @@ class CartScreen extends StatelessWidget {
                                       width: 58,
                                       height: 58,
                                       decoration: BoxDecoration(
-                                        color: itemColor,
+                                        color: itemColor.withOpacity(0.1),
                                         borderRadius: BorderRadius.circular(18),
                                       ),
                                       child: Icon(
@@ -110,7 +184,7 @@ class CartScreen extends StatelessWidget {
                                             style: TextStyle(
                                               fontSize: 14,
                                               fontWeight: FontWeight.w700,
-                                              color: Theme.of(context).colorScheme.primary,
+                                              color: const Color(0xFF10B981),
                                             ),
                                           ),
                                         ],
@@ -122,7 +196,7 @@ class CartScreen extends StatelessWidget {
                                       },
                                       icon: const Icon(
                                         Icons.delete_outline_rounded,
-                                        color: Color(0xFFDC2626),
+                                        color: Color(0xFFEF4444),
                                       ),
                                     ),
                                   ],
@@ -161,9 +235,9 @@ class CartScreen extends StatelessWidget {
                                     Text(
                                       _formatPrice(totalPrice),
                                       style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w800,
-                                        color: Theme.of(context).colorScheme.primary,
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w900,
+                                        color: const Color(0xFF10B981),
                                       ),
                                     ),
                                   ],
@@ -171,22 +245,26 @@ class CartScreen extends StatelessWidget {
                                 const SizedBox(height: 16),
                                 SizedBox(
                                   width: double.infinity,
-                                  height: 54,
+                                  height: 56,
                                   child: ElevatedButton(
-                                    onPressed: cartItems.isEmpty ? null : () {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Оформление заказа позже'),
-                                        ),
-                                      );
-                                    },
-                                    child: const Text(
-                                      'Оформить заказ',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF10B981),
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
                                       ),
+                                      elevation: 0,
                                     ),
+                                    onPressed: (cartItems.isEmpty || _isLoading) ? null : () => _processCheckout(context),
+                                    child: _isLoading 
+                                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                      : const Text(
+                                        'Оформить заказ',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
                                   ),
                                 ),
                               ],
@@ -201,3 +279,4 @@ class CartScreen extends StatelessWidget {
     );
   }
 }
+

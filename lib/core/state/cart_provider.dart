@@ -17,7 +17,7 @@ class CartProvider extends ChangeNotifier {
     if (data != null) {
       try {
         final List<dynamic> decoded = json.decode(data);
-        _items = decoded.map((item) => Map<String, dynamic>.from(item)).toList();
+        _items = decoded.map((item) => _hydrateMap(Map<String, dynamic>.from(item))).toList();
         notifyListeners();
       } catch (e) {
         debugPrint('Error loading cart: $e');
@@ -25,21 +25,58 @@ class CartProvider extends ChangeNotifier {
     }
   }
 
+  Map<String, dynamic> _hydrateMap(Map<String, dynamic> map) {
+    final result = <String, dynamic>{};
+    map.forEach((key, value) {
+      if (value is Map<String, dynamic> && value.containsKey('_type')) {
+        final type = value['_type'];
+        if (type == 'Color') {
+          result[key] = Color(value['value']);
+        } else if (type == 'IconData') {
+          result[key] = IconData(value['codePoint'], fontFamily: 'MaterialIcons');
+        } else if (type == 'DateTime') {
+          result[key] = DateTime.parse(value['value']);
+        } else {
+          result[key] = value;
+        }
+      } else if (value is Map<String, dynamic>) {
+        result[key] = _hydrateMap(value);
+      } else {
+        result[key] = value;
+      }
+    });
+    return result;
+  }
+
+
   Future<void> _saveCart() async {
     final prefs = await SharedPreferences.getInstance();
-    // We need to handle IconData and Color specially if we were storing them as raw objects,
-    // but in a real app we'd store IDs or strings. 
-    // For now, let's just store serializable data.
+    
+    // Deep copy and sanitize for JSON
     final serializable = _items.map((item) {
-      final copy = Map<String, dynamic>.from(item);
-      // Remove or convert non-serializable fields if they exist
-      if (copy['iconColor'] is Color) copy['iconColor'] = (copy['iconColor'] as Color).value;
-      if (copy['color'] is Color) copy['color'] = (copy['color'] as Color).value;
-      if (copy['icon'] is IconData) copy['icon'] = (copy['icon'] as IconData).codePoint;
+      final copy = _sanitizeMap(item);
       return copy;
     }).toList();
     
     await prefs.setString('cart_items', json.encode(serializable));
+  }
+
+  Map<String, dynamic> _sanitizeMap(Map<String, dynamic> map) {
+    final result = <String, dynamic>{};
+    map.forEach((key, value) {
+      if (value is Color) {
+        result[key] = {'_type': 'Color', 'value': value.value};
+      } else if (value is IconData) {
+        result[key] = {'_type': 'IconData', 'codePoint': value.codePoint};
+      } else if (value is DateTime) {
+        result[key] = {'_type': 'DateTime', 'value': value.toIso8601String()};
+      } else if (value is Map<String, dynamic>) {
+        result[key] = _sanitizeMap(value);
+      } else {
+        result[key] = value;
+      }
+    });
+    return result;
   }
 
   void addItem(Map<String, dynamic> item) {
@@ -47,6 +84,7 @@ class CartProvider extends ChangeNotifier {
     _saveCart();
     notifyListeners();
   }
+
 
   void removeItem(int index) {
     if (index >= 0 && index < _items.length) {

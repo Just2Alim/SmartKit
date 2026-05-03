@@ -38,6 +38,9 @@ import '../../features/b2b/inventory/presentation/b2b_dashboard_screen.dart';
 import '../../features/b2b/inventory/presentation/b2b_inventory_screen.dart';
 import '../../features/b2b/inventory/presentation/b2b_medicine_detail_screen.dart';
 import '../../features/b2b/inventory/presentation/b2b_notifications_screen.dart';
+import '../../features/b2b/inventory/presentation/b2b_sales_history_screen.dart';
+import '../../features/b2b/inventory/presentation/b2b_locations_screen.dart';
+import '../../features/b2b/main/presentation/b2b_main_screen.dart';
 import '../../features/b2b/reports/presentation/b2b_reports_screen.dart';
 import '../../features/b2b/settings/presentation/b2b_settings_screen.dart';
 import '../../features/b2b/team/presentation/b2b_team_screen.dart';
@@ -165,8 +168,9 @@ class AppRouter {
       case AppRoutes.b2bSignup:
         return _page(const B2BSignupScreen());
 
+      case AppRoutes.b2bMain:
       case AppRoutes.b2bDashboard:
-        return _page(B2BDashboardScreen());
+        return _page(const B2BMainScreen());
 
       case AppRoutes.b2bInventory:
         return _page(B2BInventoryScreen());
@@ -189,6 +193,12 @@ class AppRouter {
 
       case AppRoutes.b2bTeam:
         return _page(const B2BTeamScreen());
+
+      case AppRoutes.b2bSalesHistory:
+        return _page(const B2BSalesHistoryScreen());
+
+      case AppRoutes.b2bLocations:
+        return _page(const B2BLocationsScreen());
 
       default:
         return _page(

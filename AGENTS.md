@@ -1,4 +1,4 @@
-# SmartKit Project Status - Claude Log
+# SmartKit Project Status - Codex Log
 
 ## Current Tasks
 - [x] Apply Premium Color Palette (Based on MedHub Figma Prototype)

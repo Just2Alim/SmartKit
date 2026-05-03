@@ -1,26 +1,16 @@
-import 'package:shared_preferences/shared_preferences.dart';
-import 'ai_service_interface.dart';
-import 'gemini_service.dart';
 import 'ollama_service.dart';
+import 'ai_service_interface.dart';
 
 class AiProvider {
-  static const String _localAiKey = 'use_local_ai';
-  
   static Future<bool> isLocalAiEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_localAiKey) ?? false;
+    return true; // Always true for Ollama
   }
 
   static Future<void> setLocalAiEnabled(bool enabled) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_localAiKey, enabled);
+    // No-op, we only use local AI now
   }
 
   static Future<AiService> getService() async {
-    if (await isLocalAiEnabled()) {
-      return OllamaService.instance;
-    } else {
-      return GeminiService.instance;
-    }
+    return OllamaService.instance;
   }
 }

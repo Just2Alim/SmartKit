@@ -8,6 +8,8 @@ class B2BInventoryModel {
   final int stock;
   final int minStock;
   final int price;
+  final String? locationId;
+  final DateTime? expiryDate;
   final DateTime createdAt;
 
   B2BInventoryModel({
@@ -18,8 +20,11 @@ class B2BInventoryModel {
     required this.stock,
     required this.minStock,
     required this.price,
+    this.locationId,
+    this.expiryDate,
     required this.createdAt,
   });
+
 
   Map<String, dynamic> toMap() {
     return {
@@ -29,6 +34,8 @@ class B2BInventoryModel {
       'stock': stock,
       'minStock': minStock,
       'price': price,
+      'locationId': locationId,
+      'expiryDate': expiryDate != null ? Timestamp.fromDate(expiryDate!) : null,
       'createdAt': Timestamp.fromDate(createdAt),
     };
   }
@@ -46,6 +53,10 @@ class B2BInventoryModel {
       stock: data['stock'] ?? 0,
       minStock: data['minStock'] ?? 0,
       price: data['price'] ?? 0,
+      locationId: data['locationId'],
+      expiryDate: data['expiryDate'] != null
+          ? (data['expiryDate'] as Timestamp).toDate()
+          : null,
       createdAt: data['createdAt'] != null
           ? (data['createdAt'] as Timestamp).toDate()
           : DateTime.now(),

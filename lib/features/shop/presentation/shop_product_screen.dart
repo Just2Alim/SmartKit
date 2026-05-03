@@ -10,17 +10,25 @@ class ShopProductScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = [
-      'Продуманная подборка',
-      'Подходит для базовых сценариев',
-      'Можно использовать как основу аптечки',
-      'Удобно для дома или поездок',
-    ];
+    final isB2B = product.containsKey('b2b_item');
+    
+    final List<String> details = isB2B 
+      ? [
+          'Сертифицированный препарат',
+          'Соблюдение условий хранения',
+          'Актуальный срок годности',
+          'Инструкция в комплекте',
+        ]
+      : [
+          'Продуманная подборка',
+          'Подходит для базовых сценариев',
+          'Можно использовать как основу аптечки',
+          'Удобно для дома или поездок',
+        ];
 
     return Scaffold(
-
       appBar: AppBar(
-        title: const Text('Товар'),
+        title: Text(isB2B ? 'Лекарство' : 'Набор'),
         actions: [
           IconButton(
             onPressed: () {
@@ -40,17 +48,13 @@ class ShopProductScreen extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(28),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? (product['color'] as Color).withOpacity(0.2)
-                      : (product['color'] as Color),
+                  color: (product['color'] as Color).withOpacity(0.15),
                   borderRadius: BorderRadius.circular(28),
                 ),
                 child: Icon(
                   product['icon'] as IconData,
                   size: 72,
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? (product['iconColor'] as Color).withOpacity(0.9)
-                      : (product['iconColor'] as Color),
+                  color: (product['iconColor'] as Color),
                 ),
               ),
               const SizedBox(height: 24),
@@ -82,7 +86,7 @@ class ShopProductScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               Text(
-                'Что входит',
+                'Особенности',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
@@ -90,7 +94,7 @@ class ShopProductScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              ...items.map(
+              ...details.map(
                 (item) => Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Container(
@@ -113,9 +117,7 @@ class ShopProductScreen extends StatelessWidget {
                           width: 38,
                           height: 38,
                           decoration: BoxDecoration(
-                            color: Theme.of(context).brightness == Brightness.dark
-                                ? const Color(0xFF1E3A8A).withOpacity(0.3)
-                                : const Color(0xFFDBEAFE),
+                            color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
@@ -163,3 +165,4 @@ class ShopProductScreen extends StatelessWidget {
     );
   }
 }
+

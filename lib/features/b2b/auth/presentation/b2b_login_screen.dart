@@ -44,7 +44,7 @@ class _B2BLoginScreenState extends State<B2BLoginScreen> {
 
       Navigator.pushNamedAndRemoveUntil(
         context,
-        AppRoutes.b2bDashboard,
+        AppRoutes.b2bMain,
         (route) => false,
       );
     } catch (e) {
@@ -78,7 +78,7 @@ class _B2BLoginScreenState extends State<B2BLoginScreen> {
                 height: 88,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF2563EB), Color(0xFF7C3AED)],
+                    colors: [Color(0xFF10B981), Color(0xFF059669)],
                   ),
                   borderRadius: BorderRadius.circular(28),
                 ),
@@ -180,7 +180,7 @@ class _B2BLoginScreenState extends State<B2BLoginScreen> {
                   'Нет B2B аккаунта? Зарегистрироваться',
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF2563EB),
+                    color: Color(0xFF10B981),
                   ),
                 ),
               ),

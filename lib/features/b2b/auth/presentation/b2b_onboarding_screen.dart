@@ -21,14 +21,14 @@ class B2BOnboardingScreen extends StatelessWidget {
                 height: 120,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF2563EB), Color(0xFF7C3AED)],
+                    colors: [Color(0xFF10B981), Color(0xFF059669)],
                   ),
                   borderRadius: BorderRadius.circular(36),
                   boxShadow: [
                     BoxShadow(
                       blurRadius: 22,
                       offset: const Offset(0, 12),
-                      color: const Color(0xFF2563EB).withOpacity(0.25),
+                      color: const Color(0xFF10B981).withOpacity(0.25),
                     ),
                   ],
                 ),
@@ -89,6 +89,13 @@ class B2BOnboardingScreen extends StatelessWidget {
                 width: double.infinity,
                 height: 54,
                 child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
                   onPressed: () {
                     Navigator.pushNamed(context, AppRoutes.b2bLogin);
                   },
@@ -112,7 +119,7 @@ class B2BOnboardingScreen extends StatelessWidget {
                   'Создать B2B аккаунт',
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF2563EB),
+                    color: Color(0xFF10B981),
                   ),
                 ),
               ),
@@ -147,12 +154,12 @@ class B2BOnboardingScreen extends StatelessWidget {
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: const Color(0xFFDBEAFE),
+              color: const Color(0xFFD1FAE5),
               borderRadius: BorderRadius.circular(15),
             ),
             child: const Icon(
               Icons.check_rounded,
-              color: Color(0xFF2563EB),
+              color: Color(0xFF10B981),
             ),
           ),
           const SizedBox(width: 14),

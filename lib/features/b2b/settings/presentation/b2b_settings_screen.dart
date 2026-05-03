@@ -16,6 +16,31 @@ class _B2BSettingsScreenState extends State<B2BSettingsScreen> {
   bool autoReports = false;
 
   Future<void> _logout(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        title: const Text('Выход', style: TextStyle(fontWeight: FontWeight.w900)),
+        content: const Text('Вы уверены, что хотите выйти из B2B аккаунта?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Выйти'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
     final authService = FirebaseAuthService();
     await authService.signOut();
 
@@ -32,103 +57,108 @@ class _B2BSettingsScreenState extends State<B2BSettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: const Text('B2B настройки'),
-      ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          children: [
-            _sectionTitle('Уведомления'),
-            const SizedBox(height: 12),
-            _switchTile(
-              icon: Icons.warning_amber_rounded,
-              title: 'Низкий остаток',
-              subtitle: 'Получать уведомления о критичных товарах',
-              value: lowStockNotifications,
-              onChanged: (value) {
-                setState(() {
-                  lowStockNotifications = value;
-                });
-              },
-            ),
-            const SizedBox(height: 12),
-            _switchTile(
-              icon: Icons.analytics_rounded,
-              title: 'Отчёты',
-              subtitle: 'Уведомления о складской аналитике',
-              value: reportsNotifications,
-              onChanged: (value) {
-                setState(() {
-                  reportsNotifications = value;
-                });
-              },
-            ),
-            const SizedBox(height: 12),
-            _switchTile(
-              icon: Icons.schedule_rounded,
-              title: 'Автоотчёты',
-              subtitle: 'Еженедельная сводка по складу',
-              value: autoReports,
-              onChanged: (value) {
-                setState(() {
-                  autoReports = value;
-                });
-              },
-            ),
-
-            const SizedBox(height: 24),
-
-            _sectionTitle('Разделы'),
-            const SizedBox(height: 12),
-            _settingsTile(
-              icon: Icons.inventory_2_rounded,
-              title: 'Склад',
-              subtitle: 'Управление товарами и остатками',
-              onTap: () {
-                Navigator.pushNamed(context, AppRoutes.b2bInventory);
-              },
-            ),
-            const SizedBox(height: 12),
-            _settingsTile(
-              icon: Icons.group_rounded,
-              title: 'Команда',
-              subtitle: 'Сотрудники и роли',
-              onTap: () {
-                Navigator.pushNamed(context, AppRoutes.b2bTeam);
-              },
-            ),
-            const SizedBox(height: 12),
-            _settingsTile(
-              icon: Icons.analytics_rounded,
-              title: 'Отчёты',
-              subtitle: 'Аналитика бизнеса',
-              onTap: () {
-                Navigator.pushNamed(context, AppRoutes.b2bReports);
-              },
-            ),
-
-            const SizedBox(height: 32),
-
-            SizedBox(
-              width: double.infinity,
-              height: 54,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFDC2626),
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          _buildAppBar(),
+          SliverPadding(
+            padding: const EdgeInsets.all(20),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                _sectionTitle('Уведомления'),
+                const SizedBox(height: 16),
+                _switchCard(
+                  icon: Icons.warning_amber_rounded,
+                  title: 'Низкий остаток',
+                  subtitle: 'Уведомления о критических товарах',
+                  value: lowStockNotifications,
+                  onChanged: (val) => setState(() => lowStockNotifications = val),
                 ),
-                onPressed: () => _logout(context),
-                icon: const Icon(Icons.logout_rounded),
-                label: const Text(
-                  'Выйти из B2B аккаунта',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
+                const SizedBox(height: 12),
+                _switchCard(
+                  icon: Icons.analytics_rounded,
+                  title: 'Отчёты',
+                  subtitle: 'Уведомления о складской аналитике',
+                  value: reportsNotifications,
+                  onChanged: (val) => setState(() => reportsNotifications = val),
+                ),
+                const SizedBox(height: 12),
+                _switchCard(
+                  icon: Icons.schedule_rounded,
+                  title: 'Автоотчёты',
+                  subtitle: 'Еженедельная сводка по складу',
+                  value: autoReports,
+                  onChanged: (val) => setState(() => autoReports = val),
+                ),
+                
+                const SizedBox(height: 32),
+                _sectionTitle('Управление'),
+                const SizedBox(height: 16),
+                _navCard(
+                  icon: Icons.group_rounded,
+                  title: 'Команда',
+                  subtitle: 'Сотрудники и роли доступа',
+                  onTap: () => Navigator.pushNamed(context, AppRoutes.b2bTeam),
+                ),
+                const SizedBox(height: 12),
+                _navCard(
+                  icon: Icons.store_rounded,
+                  title: 'Информация о аптеке',
+                  subtitle: 'Адрес, контакты и реквизиты',
+                  onTap: () {},
+                ),
+
+                const SizedBox(height: 48),
+                SizedBox(
+                  width: double.infinity,
+                  height: 60,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFEE2E2),
+                      foregroundColor: const Color(0xFFDC2626),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    ),
+                    onPressed: () => _logout(context),
+                    icon: const Icon(Icons.logout_rounded),
+                    label: const Text(
+                      'Выйти из профиля',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 40),
+              ]),
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppBar() {
+    return SliverAppBar(
+      expandedHeight: 120,
+      pinned: true,
+      elevation: 0,
+      backgroundColor: const Color(0xFF10B981),
+      flexibleSpace: FlexibleSpaceBar(
+        titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
+        title: const Text(
+          'Настройки бизнеса',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            fontSize: 20,
+            letterSpacing: -0.5,
+          ),
+        ),
+        background: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF10B981), Color(0xFF059669)],
+            ),
+          ),
         ),
       ),
     );
@@ -136,16 +166,70 @@ class _B2BSettingsScreenState extends State<B2BSettingsScreen> {
 
   Widget _sectionTitle(String text) {
     return Text(
-      text,
+      text.toUpperCase(),
       style: const TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.w800,
-        color: Color(0xFF111827),
+        fontSize: 13,
+        fontWeight: FontWeight.w900,
+        color: Color(0xFF94A3B8),
+        letterSpacing: 1.2,
       ),
     );
   }
 
-  Widget _settingsTile({
+  Widget _switchCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: const Color(0xFF10B981)),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
+                ),
+                Text(
+                  subtitle,
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+          Switch.adaptive(
+            activeColor: const Color(0xFF10B981),
+            value: value,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _navCard({
     required IconData icon,
     required String title,
     required String subtitle,
@@ -155,86 +239,44 @@ class _B2BSettingsScreenState extends State<B2BSettingsScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(24),
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
+          ],
+          border: Border.all(color: const Color(0xFFF1F5F9)),
         ),
         child: Row(
           children: [
-            Icon(icon, color: const Color(0xFF2563EB)),
-            const SizedBox(width: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(icon, color: const Color(0xFF10B981)),
+            ),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
                   ),
                   Text(
                     subtitle,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF6B7280),
-                    ),
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios_rounded, size: 18),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _switchTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: const Color(0xFF2563EB)),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF6B7280),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-          ),
-        ],
       ),
     );
   }

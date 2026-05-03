@@ -2,7 +2,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../data/b2b_inventory_repository.dart';
+import '../data/b2b_locations_repository.dart';
 import '../models/b2b_inventory_model.dart';
+import '../models/b2b_location_model.dart';
 
 class B2BAddMedicineScreen extends StatefulWidget {
   const B2BAddMedicineScreen({super.key});
@@ -20,7 +22,9 @@ class _B2BAddMedicineScreenState extends State<B2BAddMedicineScreen> {
   final priceCtrl = TextEditingController();
 
   String selectedCategory = 'Обезболивающее';
+  String? selectedLocationId;
   bool isLoading = false;
+  List<B2BLocationModel> locations = [];
 
   final categories = const [
     'Обезболивающее',
@@ -30,6 +34,28 @@ class _B2BAddMedicineScreenState extends State<B2BAddMedicineScreen> {
     'Антисептик',
     'Другое',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLocations();
+  }
+
+  Future<void> _fetchLocations() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    
+    // Using a simple future for now instead of stream for initialization
+    final locs = await B2BLocationsRepository().getLocationsByUser(user.uid).first;
+    if (mounted) {
+      setState(() {
+        locations = locs;
+        if (locs.isNotEmpty) {
+          selectedLocationId = locs.first.id;
+        }
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -82,6 +108,7 @@ class _B2BAddMedicineScreenState extends State<B2BAddMedicineScreen> {
         stock: stock,
         minStock: minStock,
         price: price,
+        locationId: selectedLocationId,
         createdAt: DateTime.now(),
       );
 
@@ -127,6 +154,8 @@ class _B2BAddMedicineScreenState extends State<B2BAddMedicineScreen> {
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text('Добавить товар'),
+        backgroundColor: const Color(0xFF10B981),
+        foregroundColor: Colors.white,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -174,6 +203,37 @@ class _B2BAddMedicineScreenState extends State<B2BAddMedicineScreen> {
               ),
               const SizedBox(height: 16),
 
+              _label('Локация хранения'),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: selectedLocationId,
+                    isExpanded: true,
+                    hint: const Text('Выберите локацию'),
+                    items: locations
+                        .map(
+                          (loc) => DropdownMenuItem(
+                            value: loc.id,
+                            child: Text(loc.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedLocationId = value;
+                      });
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
               _label('Остаток на складе'),
               TextField(
                 controller: stockCtrl,
@@ -209,6 +269,13 @@ class _B2BAddMedicineScreenState extends State<B2BAddMedicineScreen> {
                 height: 54,
                 child: ElevatedButton(
                   onPressed: isLoading ? null : saveItem,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
                   child: isLoading
                       ? const SizedBox(
                           width: 22,
@@ -219,7 +286,7 @@ class _B2BAddMedicineScreenState extends State<B2BAddMedicineScreen> {
                           ),
                         )
                       : const Text(
-                          'Сохранить',
+                          'Сохранить товар',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,

@@ -34,6 +34,7 @@ class AppRoutes {
   static const b2bOnboarding = '/b2b-onboarding';
   static const b2bLogin = '/b2b-login';
   static const b2bSignup = '/b2b-signup';
+  static const b2bMain = '/b2b-main';
   static const b2bDashboard = '/b2b-dashboard';
   static const b2bInventory = '/b2b-inventory';
   static const b2bAddMedicine = '/b2b-add-medicine';
@@ -42,4 +43,6 @@ class AppRoutes {
   static const b2bReports = '/b2b-reports';
   static const b2bSettings = '/b2b-settings';
   static const b2bTeam = '/b2b-team';
+  static const b2bSalesHistory = '/b2b-sales-history';
+  static const b2bLocations = '/b2b-locations';
 }

@@ -23,7 +23,7 @@ class _B2BMedicineDetailScreenState extends State<B2BMedicineDetailScreen> {
   Color _statusColor(B2BInventoryModel item) {
     if (item.stock <= item.minStock) return const Color(0xFFDC2626);
     if (item.stock <= item.minStock * 2) return const Color(0xFFEA580C);
-    return const Color(0xFF16A34A);
+    return const Color(0xFF10B981);
   }
 
   String _statusText(B2BInventoryModel item) {
@@ -95,19 +95,23 @@ class _B2BMedicineDetailScreenState extends State<B2BMedicineDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: const Text('Детали товара'),
-      ),
       body: FutureBuilder<B2BInventoryModel?>(
         future: _repository.getItemById(widget.medicineId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator(color: Color(0xFF10B981)));
           }
 
           if (snapshot.hasError) {
             return Center(
-              child: Text('Ошибка: ${snapshot.error}'),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline_rounded, size: 48, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text('Ошибка: ${snapshot.error}', style: const TextStyle(color: Color(0xFF64748B))),
+                ],
+              ),
             );
           }
 
@@ -115,228 +119,300 @@ class _B2BMedicineDetailScreenState extends State<B2BMedicineDetailScreen> {
 
           if (item == null) {
             return const Center(
-              child: Text('Товар не найден'),
+              child: Text('Товар не найден', style: TextStyle(color: Color(0xFF64748B))),
             );
           }
 
           final statusColor = _statusColor(item);
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            child: Column(
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(22),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        statusColor.withOpacity(0.85),
-                        statusColor,
-                      ],
+          return CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              SliverAppBar(
+                expandedHeight: 220,
+                pinned: true,
+                stretch: true,
+                backgroundColor: statusColor,
+                elevation: 0,
+                leading: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.2),
+                      shape: BoxShape.circle,
                     ),
-                    borderRadius: BorderRadius.circular(28),
-                    boxShadow: [
-                      BoxShadow(
-                        blurRadius: 18,
-                        offset: const Offset(0, 8),
-                        color: statusColor.withOpacity(0.25),
-                      ),
-                    ],
+                    child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
                   ),
-                  child: Column(
+                ),
+                flexibleSpace: FlexibleSpaceBar(
+                  stretchModes: const [
+                    StretchMode.zoomBackground,
+                    StretchMode.blurBackground,
+                  ],
+                  background: Stack(
+                    fit: StackFit.expand,
                     children: [
                       Container(
-                        width: 78,
-                        height: 78,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.18),
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        child: const Icon(
-                          Icons.inventory_2_rounded,
-                          color: Colors.white,
-                          size: 38,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        item.name,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              statusColor.withOpacity(0.8),
+                              statusColor,
+                            ],
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _statusText(item),
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.white.withOpacity(0.92),
+                      Center(
+                        child: Hero(
+                          tag: 'medicine_${item.id}',
+                          child: Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(32),
+                            ),
+                            child: const Icon(
+                              Icons.medication_rounded,
+                              color: Colors.white,
+                              size: 64,
+                            ),
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-
-                const SizedBox(height: 24),
-
-                _infoCard(
-                  title: 'Информация о товаре',
-                  children: [
-                    _infoRow('Категория', item.category),
-                    _infoRow('Цена', _formatPrice(item.price)),
-                    _infoRow('Остаток', '${item.stock} шт'),
-                    _infoRow('Минимальный остаток', '${item.minStock} шт'),
-                    _infoRow('Дата добавления', _formatDate(item.createdAt)),
-                  ],
-                ),
-
-                const SizedBox(height: 16),
-
-                _infoCard(
-                  title: 'Статус склада',
-                  children: [
-                    _statusBox(item),
-                  ],
-                ),
-
-                const SizedBox(height: 28),
-
-                SizedBox(
-                  width: double.infinity,
-                  height: 54,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFDC2626),
-                    ),
-                    onPressed: isDeleting ? null : _deleteItem,
-                    icon: isDeleting
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
+              ),
+              SliverToBoxAdapter(
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 28, 24, 40),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.name,
+                                    style: const TextStyle(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFF1E293B),
+                                      letterSpacing: -0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    item.category,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      color: Color(0xFF64748B),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          )
-                        : const Icon(Icons.delete_outline_rounded),
-                    label: Text(
-                      isDeleting ? 'Удаление...' : 'Удалить товар',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                      ),
+                            _statusTag(item),
+                          ],
+                        ),
+                        const SizedBox(height: 32),
+                        
+                        _sectionTitle('Информация о товаре'),
+                        const SizedBox(height: 16),
+                        _infoGrid(item),
+                        
+                        const SizedBox(height: 32),
+                        _sectionTitle('Управление запасами'),
+                        const SizedBox(height: 16),
+                        _stockControlCard(item),
+                        
+                        const SizedBox(height: 40),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 60,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFFF1F2),
+                              foregroundColor: const Color(0xFFE11D48),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                side: const BorderSide(color: Color(0xFFFECDD3)),
+                              ),
+                            ),
+                            onPressed: isDeleting ? null : _deleteItem,
+                            icon: isDeleting
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Color(0xFFE11D48),
+                                    ),
+                                  )
+                                : const Icon(Icons.delete_outline_rounded),
+                            label: Text(
+                              isDeleting ? 'Удаление...' : 'Удалить из базы',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           );
         },
       ),
     );
   }
 
-  Widget _infoCard({
-    required String title,
-    required List<Widget> children,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-            color: Colors.black.withOpacity(0.04),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF111827),
-            ),
-          ),
-          const SizedBox(height: 14),
-          ...children,
-        ],
+  Widget _sectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.w800,
+        color: Color(0xFF1E293B),
+        letterSpacing: -0.3,
       ),
     );
   }
 
-  Widget _infoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 4,
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF6B7280),
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 5,
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF111827),
-              ),
-            ),
-          ),
-        ],
-      ),
+  Widget _infoGrid(B2BInventoryModel item) {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+      childAspectRatio: 2.2,
+      children: [
+        _gridItem('Цена', _formatPrice(item.price), Icons.payments_outlined),
+        _gridItem('Текущий остаток', '${item.stock} шт', Icons.inventory_2_outlined),
+        _gridItem('Минимум', '${item.minStock} шт', Icons.low_priority_rounded),
+        _gridItem('Создано', _formatDate(item.createdAt), Icons.calendar_today_outlined),
+      ],
     );
   }
 
-  Widget _statusBox(B2BInventoryModel item) {
-    final color = _statusColor(item);
-
+  Widget _gridItem(String label, String value, IconData icon) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(18),
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.warning_amber_rounded,
-            color: color,
-          ),
+          Icon(icon, size: 18, color: const Color(0xFF64748B)),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              _statusText(item),
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: color,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  value,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
+                ),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _stockControlCard(B2BInventoryModel item) {
+    final color = _statusColor(item);
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: color.withOpacity(0.1)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.analytics_outlined, color: color, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _statusText(item),
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: LinearProgressIndicator(
+              value: item.stock / (item.minStock * 4).clamp(item.stock, double.infinity).toDouble(),
+              backgroundColor: color.withOpacity(0.1),
+              valueColor: AlwaysStoppedAnimation(color),
+              minHeight: 8,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusTag(B2BInventoryModel item) {
+    final color = _statusColor(item);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(
+        item.stock > item.minStock ? 'В наличии' : 'Мало',
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.5,
+        ),
       ),
     );
   }
