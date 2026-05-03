@@ -13,7 +13,7 @@ class B2BLocationInventoryScreen extends StatelessWidget {
     final inventoryRepo = B2BInventoryRepository();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -40,7 +40,9 @@ class B2BLocationInventoryScreen extends StatelessWidget {
         stream: inventoryRepo.getItemsByLocation(location.id),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: Color(0xFF10B981)));
+            return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF10B981)),
+            );
           }
 
           final items = snapshot.data ?? [];
@@ -50,11 +52,18 @@ class B2BLocationInventoryScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[300]),
+                  Icon(
+                    Icons.inventory_2_outlined,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'В этой локации пока нет товаров',
-                    style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
@@ -70,19 +79,27 @@ class B2BLocationInventoryScreen extends StatelessWidget {
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFF1F5F9)),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
                 ),
                 child: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF0FDF4),
+                        color:
+                            Theme.of(context).brightness == Brightness.dark
+                                ? const Color(0xFF064E3B)
+                                : const Color(0xFFF0FDF4),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(Icons.medication_rounded, color: Color(0xFF10B981)),
+                      child: const Icon(
+                        Icons.medication_rounded,
+                        color: Color(0xFF10B981),
+                      ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -91,11 +108,20 @@ class B2BLocationInventoryScreen extends StatelessWidget {
                         children: [
                           Text(
                             item.name,
-                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                            ),
                           ),
                           Text(
                             item.category,
-                            style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                            style: TextStyle(
+                              color:
+                                  Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                              fontSize: 12,
+                            ),
                           ),
                         ],
                       ),
@@ -105,12 +131,19 @@ class B2BLocationInventoryScreen extends StatelessWidget {
                       children: [
                         Text(
                           '${item.stock} ед.',
-                          style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
                         ),
                         if (item.stock <= item.minStock)
                           const Text(
                             'Мало!',
-                            style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.w800),
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                       ],
                     ),

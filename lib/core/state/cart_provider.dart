@@ -17,7 +17,10 @@ class CartProvider extends ChangeNotifier {
     if (data != null) {
       try {
         final List<dynamic> decoded = json.decode(data);
-        _items = decoded.map((item) => _hydrateMap(Map<String, dynamic>.from(item))).toList();
+        _items =
+            decoded
+                .map((item) => _hydrateMap(Map<String, dynamic>.from(item)))
+                .toList();
         notifyListeners();
       } catch (e) {
         debugPrint('Error loading cart: $e');
@@ -33,7 +36,10 @@ class CartProvider extends ChangeNotifier {
         if (type == 'Color') {
           result[key] = Color(value['value']);
         } else if (type == 'IconData') {
-          result[key] = IconData(value['codePoint'], fontFamily: 'MaterialIcons');
+          result[key] = IconData(
+            value['codePoint'],
+            fontFamily: 'MaterialIcons',
+          );
         } else if (type == 'DateTime') {
           result[key] = DateTime.parse(value['value']);
         } else {
@@ -48,16 +54,16 @@ class CartProvider extends ChangeNotifier {
     return result;
   }
 
-
   Future<void> _saveCart() async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     // Deep copy and sanitize for JSON
-    final serializable = _items.map((item) {
-      final copy = _sanitizeMap(item);
-      return copy;
-    }).toList();
-    
+    final serializable =
+        _items.map((item) {
+          final copy = _sanitizeMap(item);
+          return copy;
+        }).toList();
+
     await prefs.setString('cart_items', json.encode(serializable));
   }
 
@@ -79,12 +85,51 @@ class CartProvider extends ChangeNotifier {
     return result;
   }
 
-  void addItem(Map<String, dynamic> item) {
-    _items.add(item);
+  String _itemKey(Map<String, dynamic> item) {
+    return (item['id'] ?? item['title'] ?? '').toString();
+  }
+
+  int _quantityOf(Map<String, dynamic> item) {
+    return (item['quantity'] as num?)?.toInt() ?? 1;
+  }
+
+  void addItem(Map<String, dynamic> item, {int quantity = 1}) {
+    final key = _itemKey(item);
+    final existingIndex = _items.indexWhere(
+      (cartItem) => _itemKey(cartItem) == key,
+    );
+
+    if (existingIndex >= 0) {
+      final existing = _items[existingIndex];
+      existing['quantity'] = _quantityOf(existing) + quantity;
+    } else {
+      _items.add({...item, 'quantity': quantity});
+    }
+
     _saveCart();
     notifyListeners();
   }
 
+  void incrementItem(int index) {
+    if (index >= 0 && index < _items.length) {
+      _items[index]['quantity'] = _quantityOf(_items[index]) + 1;
+      _saveCart();
+      notifyListeners();
+    }
+  }
+
+  void decrementItem(int index) {
+    if (index >= 0 && index < _items.length) {
+      final quantity = _quantityOf(_items[index]);
+      if (quantity <= 1) {
+        _items.removeAt(index);
+      } else {
+        _items[index]['quantity'] = quantity - 1;
+      }
+      _saveCart();
+      notifyListeners();
+    }
+  }
 
   void removeItem(int index) {
     if (index >= 0 && index < _items.length) {
@@ -104,7 +149,11 @@ class CartProvider extends ChangeNotifier {
     return _items.fold(0, (sum, item) {
       final priceStr = item['price'] as String;
       final onlyDigits = priceStr.replaceAll(RegExp(r'[^0-9]'), '');
-      return sum + (int.tryParse(onlyDigits) ?? 0);
+      return sum + ((int.tryParse(onlyDigits) ?? 0) * _quantityOf(item));
     });
+  }
+
+  int get itemCount {
+    return _items.fold(0, (sum, item) => sum + _quantityOf(item));
   }
 }

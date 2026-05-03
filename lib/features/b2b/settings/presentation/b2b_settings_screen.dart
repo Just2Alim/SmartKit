@@ -18,25 +18,40 @@ class _B2BSettingsScreenState extends State<B2BSettingsScreen> {
   Future<void> _logout(BuildContext context) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        title: const Text('Выход', style: TextStyle(fontWeight: FontWeight.w900)),
-        content: const Text('Вы уверены, что хотите выйти из B2B аккаунта?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена', style: TextStyle(color: Color(0xFF64748B))),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFDC2626),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
             ),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Выйти'),
+            title: const Text(
+              'Выход',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+            content: const Text(
+              'Вы уверены, что хотите выйти из B2B аккаунта?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text(
+                  'Отмена',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFDC2626),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Выйти'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
 
     if (confirm != true) return;
@@ -56,7 +71,7 @@ class _B2BSettingsScreenState extends State<B2BSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
@@ -72,7 +87,8 @@ class _B2BSettingsScreenState extends State<B2BSettingsScreen> {
                   title: 'Низкий остаток',
                   subtitle: 'Уведомления о критических товарах',
                   value: lowStockNotifications,
-                  onChanged: (val) => setState(() => lowStockNotifications = val),
+                  onChanged:
+                      (val) => setState(() => lowStockNotifications = val),
                 ),
                 const SizedBox(height: 12),
                 _switchCard(
@@ -80,7 +96,8 @@ class _B2BSettingsScreenState extends State<B2BSettingsScreen> {
                   title: 'Отчёты',
                   subtitle: 'Уведомления о складской аналитике',
                   value: reportsNotifications,
-                  onChanged: (val) => setState(() => reportsNotifications = val),
+                  onChanged:
+                      (val) => setState(() => reportsNotifications = val),
                 ),
                 const SizedBox(height: 12),
                 _switchCard(
@@ -90,7 +107,7 @@ class _B2BSettingsScreenState extends State<B2BSettingsScreen> {
                   value: autoReports,
                   onChanged: (val) => setState(() => autoReports = val),
                 ),
-                
+
                 const SizedBox(height: 32),
                 _sectionTitle('Управление'),
                 const SizedBox(height: 16),
@@ -117,13 +134,18 @@ class _B2BSettingsScreenState extends State<B2BSettingsScreen> {
                       backgroundColor: const Color(0xFFFEE2E2),
                       foregroundColor: const Color(0xFFDC2626),
                       elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
                     ),
                     onPressed: () => _logout(context),
                     icon: const Icon(Icons.logout_rounded),
                     label: const Text(
                       'Выйти из профиля',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                 ),
@@ -150,7 +172,7 @@ class _B2BSettingsScreenState extends State<B2BSettingsScreen> {
             color: Colors.white,
             fontWeight: FontWeight.w900,
             fontSize: 20,
-            letterSpacing: -0.5,
+            letterSpacing: 0,
           ),
         ),
         background: Container(
@@ -167,10 +189,10 @@ class _B2BSettingsScreenState extends State<B2BSettingsScreen> {
   Widget _sectionTitle(String text) {
     return Text(
       text.toUpperCase(),
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w900,
-        color: Color(0xFF94A3B8),
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
         letterSpacing: 1.2,
       ),
     );
@@ -186,19 +208,26 @@ class _B2BSettingsScreenState extends State<B2BSettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: Colors.black.withValues(
+              alpha:
+                  Theme.of(context).brightness == Brightness.dark ? 0.22 : 0.04,
+            ),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
-        border: Border.all(color: const Color(0xFFF1F5F9)),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(icon, color: const Color(0xFF10B981)),
@@ -210,11 +239,19 @@ class _B2BSettingsScreenState extends State<B2BSettingsScreen> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
                 Text(
                   subtitle,
-                  style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
@@ -241,19 +278,30 @@ class _B2BSettingsScreenState extends State<B2BSettingsScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
+            BoxShadow(
+              color: Colors.black.withValues(
+                alpha:
+                    Theme.of(context).brightness == Brightness.dark
+                        ? 0.22
+                        : 0.04,
+              ),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
           ],
-          border: Border.all(color: const Color(0xFFF1F5F9)),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(icon, color: const Color(0xFF10B981)),
@@ -265,11 +313,19 @@ class _B2BSettingsScreenState extends State<B2BSettingsScreen> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                   ),
                   Text(
                     subtitle,
-                    style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),

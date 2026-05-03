@@ -3,9 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 enum B2BActivityType {
   sale,
   stockUpdate,
+  stockReceipt,
   itemAdded,
+  itemUpdated,
   locationCreated,
-  locationUpdated
+  locationUpdated,
 }
 
 class B2BActivityModel {
@@ -49,9 +51,10 @@ class B2BActivityModel {
       ),
       title: data['title'] ?? '',
       description: data['description'] ?? '',
-      timestamp: data['timestamp'] != null 
-          ? DateTime.parse(data['timestamp']) 
-          : DateTime.now(),
+      timestamp:
+          data['timestamp'] != null
+              ? DateTime.parse(data['timestamp'])
+              : DateTime.now(),
       metadata: data['metadata'],
     );
   }

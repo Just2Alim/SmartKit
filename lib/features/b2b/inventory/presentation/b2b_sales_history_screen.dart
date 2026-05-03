@@ -13,41 +13,46 @@ class B2BSalesHistoryScreen extends StatelessWidget {
     final salesRepository = B2BSalesRepository();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: user == null
-          ? const Center(child: Text('Пользователь не найден'))
-          : StreamBuilder<List<B2BSaleModel>>(
-              stream: salesRepository.getSalesByUser(user.uid),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator(color: Color(0xFF10B981)));
-                }
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body:
+          user == null
+              ? const Center(child: Text('Пользователь не найден'))
+              : StreamBuilder<List<B2BSaleModel>>(
+                stream: salesRepository.getSalesByUser(user.uid),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF10B981),
+                      ),
+                    );
+                  }
 
-                final sales = snapshot.data ?? [];
+                  final sales = snapshot.data ?? [];
 
-                return CustomScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  slivers: [
-                    _buildAppBar(context),
-                    if (sales.isEmpty)
-                      _buildEmptyState()
-                    else
-                      SliverPadding(
-                        padding: const EdgeInsets.all(20),
-                        sliver: SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) => Padding(
-                              padding: const EdgeInsets.only(bottom: 16),
-                              child: _SaleCard(sale: sales[index]),
+                  return CustomScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    slivers: [
+                      _buildAppBar(context),
+                      if (sales.isEmpty)
+                        _buildEmptyState()
+                      else
+                        SliverPadding(
+                          padding: const EdgeInsets.all(20),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) => Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: _SaleCard(sale: sales[index]),
+                              ),
+                              childCount: sales.length,
                             ),
-                            childCount: sales.length,
                           ),
                         ),
-                      ),
-                  ],
-                );
-              },
-            ),
+                    ],
+                  );
+                },
+              ),
     );
   }
 
@@ -65,7 +70,7 @@ class B2BSalesHistoryScreen extends StatelessWidget {
             color: Colors.white,
             fontWeight: FontWeight.w900,
             fontSize: 20,
-            letterSpacing: -0.5,
+            letterSpacing: 0,
           ),
         ),
         background: Container(
@@ -81,37 +86,54 @@ class B2BSalesHistoryScreen extends StatelessWidget {
 
   Widget _buildEmptyState() {
     return SliverFillRemaining(
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20),
+      child: Builder(
+        builder:
+            (context) => Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(
+                            alpha:
+                                Theme.of(context).brightness == Brightness.dark
+                                    ? 0.24
+                                    : 0.06,
+                          ),
+                          blurRadius: 20,
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      Icons.history_rounded,
+                      size: 48,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Продаж пока нет',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Все ваши транзакции будут здесь',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 ],
               ),
-              child: Icon(Icons.history_rounded, size: 48, color: Colors.grey[300]),
             ),
-            const SizedBox(height: 24),
-            const Text(
-              'Продаж пока нет',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF1E293B),
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Все ваши транзакции будут здесь',
-              style: TextStyle(color: Color(0xFF64748B)),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -129,16 +151,19 @@ class _SaleCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(
+              alpha:
+                  Theme.of(context).brightness == Brightness.dark ? 0.22 : 0.04,
+            ),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
         ],
-        border: Border.all(color: const Color(0xFFF1F5F9)),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -147,24 +172,27 @@ class _SaleCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   '#${sale.id.substring(0, 8).toUpperCase()}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 12,
-                    color: Color(0xFF64748B),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     letterSpacing: 0.5,
                   ),
                 ),
               ),
               Text(
                 '${sale.totalAmount} ₸',
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: 20,
                   color: Color(0xFF10B981),
@@ -175,54 +203,67 @@ class _SaleCard extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              const Icon(Icons.access_time_rounded, size: 14, color: Color(0xFF94A3B8)),
+              const Icon(
+                Icons.access_time_rounded,
+                size: 14,
+                color: Color(0xFF94A3B8),
+              ),
               const SizedBox(width: 6),
               Text(
                 dateFormat.format(sale.saleDate),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF94A3B8),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Divider(height: 1, color: Color(0xFFF1F5F9)),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Divider(
+              height: 1,
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
           ),
-          ...sale.items.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        item['name'] ?? item['medicineName'] ?? 'Неизвестно',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF334155),
-                        ),
+          ...sale.items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item['name'] ?? item['medicineName'] ?? 'Неизвестно',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'x${item['quantity']}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF64748B),
-                        ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color:
+                          Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'x${item['quantity']}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
-                  ],
-                ),
-              )),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );

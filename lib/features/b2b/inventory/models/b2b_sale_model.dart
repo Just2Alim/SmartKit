@@ -32,16 +32,20 @@ class B2BSaleModel {
     };
   }
 
-  factory B2BSaleModel.fromDoc(
-    DocumentSnapshot<Map<String, dynamic>> doc,
-  ) {
+  factory B2BSaleModel.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data()!;
+    DateTime parseDate(dynamic value) {
+      if (value is Timestamp) return value.toDate();
+      if (value is String) return DateTime.tryParse(value) ?? DateTime.now();
+      return DateTime.now();
+    }
+
     return B2BSaleModel(
       id: doc.id,
       userId: data['userId'] ?? '',
       items: List<Map<String, dynamic>>.from(data['items'] ?? []),
-      totalAmount: data['totalAmount'] ?? 0,
-      saleDate: (data['saleDate'] as Timestamp).toDate(),
+      totalAmount: (data['totalAmount'] as num?)?.toInt() ?? 0,
+      saleDate: parseDate(data['saleDate']),
       customerId: data['customerId'],
       staffName: data['staffName'],
     );

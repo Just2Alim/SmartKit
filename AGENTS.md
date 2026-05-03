@@ -16,10 +16,42 @@
     - [x] New "Location Inventory" screen: Granular view of items stored in each location.
     - [x] Real-time Occupancy Metrics: Dynamic calculation of warehouse capacity and item counts.
     - [x] AI Location-Awareness: Integration of warehouse data into the B2BAiService for spatial insights.
-- [ ] **OCR Integration**: Implement barcode scanning for damaged packaging using MLKit.
+- [x] **OCR Integration**: Implement package OCR for damaged medication packaging using MLKit.
+- [x] **B2C Shop Modernization**: Rebuilt the user-facing shop into a full catalog experience with search, category filters, product details, quantity-aware cart, and owner-correct B2B sales recording.
+- [x] **B2B Product Operations**: Added unified add/edit product flow, OCR autofill, quick stock receipt, and richer product metadata for reports and shop display.
+- [x] **Empty-State Stability**: Fixed B2B add/report flows so empty locations, sales, or inventory no longer cause infinite loading.
+- [x] **Unified Theme & Dark Mode Pass**: Added shared theme tokens, reusable UI primitives, and dark-mode-safe surfaces across core B2B and shop flows.
 - [ ] **Activity Detail/Navigation**: Add a dedicated screen to view the full history of activities, including filtering by type.
 
 ## Completed Work
+- **Unified Design System & Dark Mode**:
+  - Expanded `AppTheme` with full light/dark color schemes, text styles, button, card, input, chip, navigation, dialog, and snackbar theming.
+  - Expanded `AppColors` with brand, dark-surface, semantic, border, shadow, and adaptive helper tokens.
+  - Implemented reusable `AppCard`, `AppButton`, `AppTextField`, `SectionTitle`, and `LoadingOverlay` widgets for future screens.
+  - Updated B2B navigation, inventory, reports, dashboard cards, locations, sales history, settings, team, OCR, and product detail surfaces to use theme-aware colors.
+  - Updated the B2C shop catalog, product detail, and cart quantity text to respect dark-mode surfaces and text colors.
+- **B2B Flow Stabilization**:
+  - Made activity logging non-blocking so product creation, stock updates, and sales do not fail if activity writes are unavailable.
+  - Removed Firestore `orderBy` dependency from sales/activity streams and moved sorting client-side to avoid missing-index failures.
+  - Added timeout-safe location loading in `B2BAddMedicineScreen`; products can be added even when no locations exist.
+  - Changed `B2BReportsScreen` to render zero-state analytics from empty lists instead of waiting forever for empty streams.
+  - Updated the public shop catalog to show every created product, including zero-stock items, with live stock badges and disabled buying when stock is unavailable.
+- **B2B OCR & Product Operations**:
+  - Added MLKit OCR package scanning for medication packaging through `B2BPackageOcrScreen`.
+  - Added OCR parsing for product name, category, dosage, package size, manufacturer, barcode, batch number, and expiry date.
+  - Expanded `B2BInventoryModel` with product metadata used by receiving, reports, and the customer shop.
+  - Rebuilt `B2BAddMedicineScreen` as a unified create/edit screen with OCR autofill and quick stock receipt.
+  - Added repository methods for item updates, stock receipt logging, public catalog streams, and transaction-safe sale stock decrementing.
+- **B2C Shop & Checkout Modernization**:
+  - Removed the "Заполнить БД" test button from the customer shop.
+  - Rebuilt `ShopScreen` into a real storefront with search, category chips, availability badges, product cards, and cart badge.
+  - Rebuilt `ShopProductScreen` with product metadata, quantity selection, stock-aware add-to-cart, and richer details.
+  - Updated `CartProvider` and `CartScreen` for quantity-aware cart behavior.
+  - Fixed checkout so online sales are recorded for the B2B inventory owner instead of the B2C customer.
+- **B2B Reports & Inventory Logic**:
+  - Added edit navigation from inventory cards and B2B product detail.
+  - Updated dashboard activity handling for product edits and stock receipts.
+  - Reworked reports to use live weekly sales revenue, sold units, average check, expiring stock, and critical inventory metrics.
 - **Location Management (Modernization)**:
   - [x] Location-specific inventory tracking: Association of items with specific storage spots.
   - [x] New "Location Inventory" screen: Granular view of items stored in each location.

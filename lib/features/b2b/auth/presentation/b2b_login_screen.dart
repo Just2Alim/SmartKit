@@ -63,7 +63,7 @@ class _B2BLoginScreenState extends State<B2BLoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('B2B вход'),
       ),

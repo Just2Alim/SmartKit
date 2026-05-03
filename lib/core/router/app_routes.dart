@@ -38,6 +38,7 @@ class AppRoutes {
   static const b2bDashboard = '/b2b-dashboard';
   static const b2bInventory = '/b2b-inventory';
   static const b2bAddMedicine = '/b2b-add-medicine';
+  static const b2bPackageOcr = '/b2b-package-ocr';
   static const b2bMedicineDetail = '/b2b-medicine-detail';
   static const b2bNotifications = '/b2b-notifications';
   static const b2bReports = '/b2b-reports';

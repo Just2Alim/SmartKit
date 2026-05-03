@@ -126,7 +126,7 @@ class _B2BSignupScreenState extends State<B2BSignupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('B2B регистрация'),
       ),

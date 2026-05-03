@@ -34,10 +34,10 @@ import '../../features/b2b/auth/presentation/b2b_login_screen.dart';
 import '../../features/b2b/auth/presentation/b2b_onboarding_screen.dart';
 import '../../features/b2b/auth/presentation/b2b_signup_screen.dart';
 import '../../features/b2b/inventory/presentation/b2b_add_medicine_screen.dart';
-import '../../features/b2b/inventory/presentation/b2b_dashboard_screen.dart';
 import '../../features/b2b/inventory/presentation/b2b_inventory_screen.dart';
 import '../../features/b2b/inventory/presentation/b2b_medicine_detail_screen.dart';
 import '../../features/b2b/inventory/presentation/b2b_notifications_screen.dart';
+import '../../features/b2b/inventory/presentation/b2b_package_ocr_screen.dart';
 import '../../features/b2b/inventory/presentation/b2b_sales_history_screen.dart';
 import '../../features/b2b/inventory/presentation/b2b_locations_screen.dart';
 import '../../features/b2b/main/presentation/b2b_main_screen.dart';
@@ -81,11 +81,13 @@ class AppRouter {
       case AppRoutes.addMedicine:
         final args = settings.arguments;
         if (args is Map<String, dynamic>) {
-          return _page(AddMedicineScreen(
-            preselectedMemberId: args['memberId'] as String?,
-            initialName: args['name'] as String?,
-            initialCategory: args['category'] as String?,
-          ));
+          return _page(
+            AddMedicineScreen(
+              preselectedMemberId: args['memberId'] as String?,
+              initialName: args['name'] as String?,
+              initialCategory: args['category'] as String?,
+            ),
+          );
         }
         return _page(AddMedicineScreen(preselectedMemberId: args as String?));
 
@@ -176,7 +178,19 @@ class AppRouter {
         return _page(B2BInventoryScreen());
 
       case AppRoutes.b2bAddMedicine:
+        final args = settings.arguments;
+        if (args is String) {
+          return _page(B2BAddMedicineScreen(medicineId: args));
+        }
+        if (args is Map<String, dynamic>) {
+          return _page(
+            B2BAddMedicineScreen(medicineId: args['medicineId'] as String?),
+          );
+        }
         return _page(const B2BAddMedicineScreen());
+
+      case AppRoutes.b2bPackageOcr:
+        return _page(const B2BPackageOcrScreen());
 
       case AppRoutes.b2bMedicineDetail:
         final medicineId = settings.arguments as String;

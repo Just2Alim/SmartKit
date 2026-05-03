@@ -13,7 +13,6 @@ import '../data/b2b_activity_repository.dart';
 import '../models/b2b_activity_model.dart';
 import '../data/b2b_locations_repository.dart';
 import '../models/b2b_location_model.dart';
-import '../../../../core/utils/db_seeder.dart';
 
 class B2BDashboardScreen extends StatelessWidget {
   B2BDashboardScreen({super.key});
@@ -30,10 +29,11 @@ class B2BDashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (user == null)
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: StreamBuilder<List<B2BInventoryModel>>(
         stream: _inventoryRepository.getItemsByUser(user.uid),
         builder: (context, inventorySnapshot) {
@@ -59,10 +59,21 @@ class B2BDashboardScreen extends StatelessWidget {
                       return CustomScrollView(
                         physics: const BouncingScrollPhysics(),
                         slivers: [
-                          _buildAppBar(context, user, lowStock, totalMeds),
+                          _buildAppBar(
+                            context,
+                            user,
+                            lowStock,
+                            totalMeds,
+                            locations.length,
+                          ),
                           SliverToBoxAdapter(
                             child: Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+                              padding: const EdgeInsets.fromLTRB(
+                                20,
+                                24,
+                                20,
+                                40,
+                              ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -78,19 +89,42 @@ class B2BDashboardScreen extends StatelessWidget {
                                     locations: locations,
                                   ),
                                   const SizedBox(height: 32),
-                                  _buildInventoryDistributionChart(inventory),
+                                  _buildInventoryDistributionChart(
+                                    context,
+                                    inventory,
+                                  ),
                                   const SizedBox(height: 32),
-                                  _buildSectionHeader('Локации хранения', () {
-                                    Navigator.pushNamed(context, AppRoutes.b2bLocations);
-                                  }, actionLabel: 'Все'),
+                                  _buildSectionHeader(
+                                    context,
+                                    'Локации хранения',
+                                    () {
+                                      Navigator.pushNamed(
+                                        context,
+                                        AppRoutes.b2bLocations,
+                                      );
+                                    },
+                                    actionLabel: 'Все',
+                                  ),
                                   const SizedBox(height: 16),
-                                  _buildLocationsList(),
+                                  _buildLocationsList(context),
                                   const SizedBox(height: 32),
-                                  _buildSectionHeader('Последняя активность', () {
-                                    Navigator.pushNamed(context, AppRoutes.b2bSalesHistory);
-                                  }, actionLabel: 'История'),
+                                  _buildSectionHeader(
+                                    context,
+                                    'Последняя активность',
+                                    () {
+                                      Navigator.pushNamed(
+                                        context,
+                                        AppRoutes.b2bSalesHistory,
+                                      );
+                                    },
+                                    actionLabel: 'История',
+                                  ),
                                   const SizedBox(height: 16),
-                                  _buildActivityList(activities, sales),
+                                  _buildActivityList(
+                                    context,
+                                    activities,
+                                    sales,
+                                  ),
                                   const SizedBox(height: 32),
                                   _buildBottomAnalyticsCard(sales),
                                   const SizedBox(height: 40),
@@ -111,7 +145,13 @@ class B2BDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildAppBar(BuildContext context, User user, int lowStock, int totalMeds) {
+  Widget _buildAppBar(
+    BuildContext context,
+    User user,
+    int lowStock,
+    int totalMeds,
+    int locationCount,
+  ) {
     return SliverAppBar(
       expandedHeight: 320,
       pinned: true,
@@ -140,7 +180,11 @@ class B2BDashboardScreen extends StatelessWidget {
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.business_center_rounded, color: Colors.white, size: 24),
+                        child: const Icon(
+                          Icons.business_center_rounded,
+                          color: Colors.white,
+                          size: 24,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -168,21 +212,39 @@ class B2BDashboardScreen extends StatelessWidget {
                         ),
                       ),
                       IconButton(
-                        onPressed: () => Navigator.pushNamed(context, AppRoutes.b2bNotifications),
+                        onPressed:
+                            () => Navigator.pushNamed(
+                              context,
+                              AppRoutes.b2bNotifications,
+                            ),
                         icon: Stack(
                           children: [
-                            const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 28),
+                            const Icon(
+                              Icons.notifications_none_rounded,
+                              color: Colors.white,
+                              size: 28,
+                            ),
                             if (lowStock > 0)
                               Positioned(
                                 right: 0,
                                 top: 0,
                                 child: Container(
                                   padding: const EdgeInsets.all(4),
-                                  decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle),
-                                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFEF4444),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  constraints: const BoxConstraints(
+                                    minWidth: 16,
+                                    minHeight: 16,
+                                  ),
                                   child: Text(
                                     '$lowStock',
-                                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                    ),
                                     textAlign: TextAlign.center,
                                   ),
                                 ),
@@ -193,7 +255,7 @@ class B2BDashboardScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 32),
-                  _buildStatsGrid(totalMeds, lowStock),
+                  _buildStatsGrid(totalMeds, lowStock, locationCount),
                 ],
               ),
             ),
@@ -203,14 +265,14 @@ class B2BDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatsGrid(int totalMeds, int lowStock) {
+  Widget _buildStatsGrid(int totalMeds, int lowStock, int locationCount) {
     return Column(
       children: [
         Row(
           children: [
             _statCard('$totalMeds', 'Всего медикаментов'),
             const SizedBox(width: 12),
-            _statCard('3', 'Локации'),
+            _statCard('$locationCount', 'Локации'),
           ],
         ),
         const SizedBox(height: 12),
@@ -291,7 +353,12 @@ class B2BDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _pillButton(String label, IconData icon, Color color, VoidCallback onTap) {
+  Widget _pillButton(
+    String label,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -330,9 +397,17 @@ class B2BDashboardScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFFEF2F2),
+        color:
+            Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF450A0A)
+                : const Color(0xFFFEF2F2),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFFEE2E2)),
+        border: Border.all(
+          color:
+              Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF991B1B)
+                  : const Color(0xFFFEE2E2),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -341,32 +416,61 @@ class B2BDashboardScreen extends StatelessWidget {
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle),
-                child: const Icon(Icons.error_outline_rounded, color: Colors.white, size: 16),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEF4444),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.error_outline_rounded,
+                  color: Colors.white,
+                  size: 16,
+                ),
               ),
               const SizedBox(width: 12),
-              const Text(
+              Text(
                 'Требуют внимания',
-                style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF1E293B), fontSize: 16),
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color:
+                      Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFFFECACA)
+                          : const Color(0xFF1E293B),
+                  fontSize: 16,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 8),
           Text(
-            '$lowStock медикамента истекают в течение 30 дней',
-            style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+            '$lowStock товара ниже минимального остатка',
+            style: TextStyle(
+              color:
+                  Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFFFCA5A5)
+                      : const Color(0xFF64748B),
+              fontSize: 13,
+            ),
           ),
           const SizedBox(height: 12),
           InkWell(
-            onTap: () => Navigator.pushNamed(context, AppRoutes.b2bNotifications),
+            onTap:
+                () => Navigator.pushNamed(context, AppRoutes.b2bNotifications),
             child: const Row(
               children: [
                 Text(
                   'Посмотреть список',
-                  style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 13),
+                  style: TextStyle(
+                    color: Color(0xFFEF4444),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                 ),
                 SizedBox(width: 4),
-                Icon(Icons.arrow_forward_rounded, size: 14, color: Color(0xFFEF4444)),
+                Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 14,
+                  color: Color(0xFFEF4444),
+                ),
               ],
             ),
           ),
@@ -375,26 +479,40 @@ class B2BDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionHeader(String title, VoidCallback onTap, {String actionLabel = 'См. все'}) {
+  Widget _buildSectionHeader(
+    BuildContext context,
+    String title,
+    VoidCallback onTap, {
+    String actionLabel = 'См. все',
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           title,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF1E293B), letterSpacing: -0.5),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            color: Theme.of(context).colorScheme.onSurface,
+            letterSpacing: 0,
+          ),
         ),
         TextButton(
           onPressed: onTap,
           child: Text(
             actionLabel,
-            style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 13),
+            style: const TextStyle(
+              color: Color(0xFF10B981),
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildLocationsList() {
+  Widget _buildLocationsList(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return const SizedBox.shrink();
 
@@ -403,133 +521,212 @@ class B2BDashboardScreen extends StatelessWidget {
       builder: (context, snapshot) {
         final locations = snapshot.data ?? [];
         if (locations.isEmpty) {
-          return const Text('Локации не настроены', style: TextStyle(color: Color(0xFF64748B)));
+          return Text(
+            'Локации не настроены',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          );
         }
 
         return Column(
-          children: locations.take(3).map((loc) => Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: const Color(0xFFF1F5F9)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0FDF4),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.location_on_rounded, color: Color(0xFF10B981), size: 20),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        loc.name,
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xFF1E293B)),
+          children:
+              locations
+                  .take(3)
+                  .map(
+                    (loc) => Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).cardColor,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(
+                              alpha:
+                                  Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? 0.22
+                                      : 0.04,
+                            ),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                      Text(
-                        '${loc.currentItems} позиций • ${loc.type == 'Warehouse' ? 'Склад' : 'Аптека'}',
-                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.w500),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color:
+                                  Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? const Color(0xFF064E3B)
+                                      : const Color(0xFFF0FDF4),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.location_on_rounded,
+                              color: Color(0xFF10B981),
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  loc.name,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15,
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
+                                  ),
+                                ),
+                                Text(
+                                  '${loc.currentItems} позиций • ${loc.type == 'Warehouse' ? 'Склад' : 'Аптека'}',
+                                  style: TextStyle(
+                                    color:
+                                        Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: (loc.status == 'Active'
+                                      ? const Color(0xFF10B981)
+                                      : const Color(0xFFEF4444))
+                                  .withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              loc.status == 'Active' ? 'OK' : 'FULL',
+                              style: TextStyle(
+                                color:
+                                    loc.status == 'Active'
+                                        ? const Color(0xFF10B981)
+                                        : const Color(0xFFEF4444),
+                                fontWeight: FontWeight.w900,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: (loc.status == 'Active' ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    loc.status == 'Active' ? 'OK' : 'FULL',
-                    style: TextStyle(
-                      color: loc.status == 'Active' ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                      fontWeight: FontWeight.w900,
-                      fontSize: 10,
                     ),
-                  ),
-                ),
-              ],
-            ),
-          )).toList(),
+                  )
+                  .toList(),
         );
       },
     );
   }
 
-  Widget _buildActivityList(List<B2BActivityModel> activities, List<B2BSaleModel> sales) {
+  Widget _buildActivityList(
+    BuildContext context,
+    List<B2BActivityModel> activities,
+    List<B2BSaleModel> sales,
+  ) {
     if (activities.isEmpty && sales.isEmpty) {
-      return const Text('Нет недавней активности', style: TextStyle(color: Color(0xFF64748B)));
+      return Text(
+        'Нет недавней активности',
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+      );
     }
 
     if (activities.isEmpty) {
       final timeFormat = DateFormat('HH:mm');
       return Column(
-        children: sales.take(5).map((sale) => _buildActivityItem(
-          title: sale.items.isNotEmpty 
-              ? (sale.items.first['name'] ?? sale.items.first['medicineName'] ?? 'Продажа') 
-              : 'Продажа',
-          subtitle: sale.staffName ?? 'Администратор',
-          value: '+${sale.totalAmount} ₸',
-          icon: Icons.shopping_bag_outlined,
-          timestamp: sale.saleDate,
-          timeFormat: timeFormat,
-        )).toList(),
+        children:
+            sales
+                .take(5)
+                .map(
+                  (sale) => _buildActivityItem(
+                    context: context,
+                    title:
+                        sale.items.isNotEmpty
+                            ? (sale.items.first['name'] ??
+                                sale.items.first['medicineName'] ??
+                                'Продажа')
+                            : 'Продажа',
+                    subtitle: sale.staffName ?? 'Администратор',
+                    value: '+${sale.totalAmount} ₸',
+                    icon: Icons.shopping_bag_outlined,
+                    timestamp: sale.saleDate,
+                    timeFormat: timeFormat,
+                  ),
+                )
+                .toList(),
       );
     }
 
     final timeFormat = DateFormat('HH:mm');
     return Column(
-      children: activities.take(5).map((activity) {
-        IconData icon;
-        Color iconColor = const Color(0xFF10B981);
-        
-        switch (activity.type) {
-          case B2BActivityType.sale:
-            icon = Icons.shopping_bag_outlined;
-            break;
-          case B2BActivityType.stockUpdate:
-            icon = Icons.inventory_2_outlined;
-            iconColor = const Color(0xFFF59E0B);
-            break;
-          case B2BActivityType.itemAdded:
-            icon = Icons.add_circle_outline_rounded;
-            break;
-          case B2BActivityType.locationCreated:
-          case B2BActivityType.locationUpdated:
-            icon = Icons.location_on_outlined;
-            iconColor = const Color(0xFF6366F1);
-            break;
-        }
+      children:
+          activities.take(5).map((activity) {
+            IconData icon;
+            Color iconColor = const Color(0xFF10B981);
 
-        return _buildActivityItem(
-          title: activity.title,
-          subtitle: activity.description,
-          value: activity.metadata?['amount'] != null ? '+${activity.metadata!['amount']} ₸' : null,
-          icon: icon,
-          iconColor: iconColor,
-          timestamp: activity.timestamp,
-          timeFormat: timeFormat,
-        );
-      }).toList(),
+            switch (activity.type) {
+              case B2BActivityType.sale:
+                icon = Icons.shopping_bag_outlined;
+                break;
+              case B2BActivityType.stockUpdate:
+                icon = Icons.inventory_2_outlined;
+                iconColor = const Color(0xFFF59E0B);
+                break;
+              case B2BActivityType.stockReceipt:
+                icon = Icons.playlist_add_check_rounded;
+                iconColor = const Color(0xFF10B981);
+                break;
+              case B2BActivityType.itemAdded:
+                icon = Icons.add_circle_outline_rounded;
+                break;
+              case B2BActivityType.itemUpdated:
+                icon = Icons.edit_note_rounded;
+                iconColor = const Color(0xFF3B82F6);
+                break;
+              case B2BActivityType.locationCreated:
+              case B2BActivityType.locationUpdated:
+                icon = Icons.location_on_outlined;
+                iconColor = const Color(0xFF6366F1);
+                break;
+            }
+
+            return _buildActivityItem(
+              context: context,
+              title: activity.title,
+              subtitle: activity.description,
+              value:
+                  activity.metadata?['amount'] != null
+                      ? '+${activity.metadata!['amount']} ₸'
+                      : null,
+              icon: icon,
+              iconColor: iconColor,
+              timestamp: activity.timestamp,
+              timeFormat: timeFormat,
+            );
+          }).toList(),
     );
   }
 
   Widget _buildActivityItem({
+    required BuildContext context,
     required String title,
     required String subtitle,
     String? value,
@@ -542,12 +739,15 @@ class B2BDashboardScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(
+              alpha:
+                  Theme.of(context).brightness == Brightness.dark ? 0.22 : 0.04,
+            ),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -570,13 +770,21 @@ class B2BDashboardScreen extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xFF1E293B)),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   subtitle,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF64748B)),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -589,11 +797,19 @@ class B2BDashboardScreen extends StatelessWidget {
               if (value != null)
                 Text(
                   value,
-                  style: TextStyle(color: iconColor, fontWeight: FontWeight.w900, fontSize: 15),
+                  style: TextStyle(
+                    color: iconColor,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
+                  ),
                 ),
               Text(
                 timeFormat.format(timestamp),
-                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
@@ -602,7 +818,10 @@ class B2BDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInventoryDistributionChart(List<B2BInventoryModel> inventory) {
+  Widget _buildInventoryDistributionChart(
+    BuildContext context,
+    List<B2BInventoryModel> inventory,
+  ) {
     if (inventory.isEmpty) return const SizedBox.shrink();
 
     final Map<String, int> categories = {};
@@ -611,8 +830,9 @@ class B2BDashboardScreen extends StatelessWidget {
     }
 
     final totalStock = inventory.fold(0, (sum, item) => sum + item.stock);
-    final sortedCategories = categories.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
+    if (totalStock <= 0) return const SizedBox.shrink();
+    final sortedCategories =
+        categories.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
     final List<Color> colors = [
       const Color(0xFF10B981),
@@ -626,12 +846,15 @@ class B2BDashboardScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(
+              alpha:
+                  Theme.of(context).brightness == Brightness.dark ? 0.22 : 0.04,
+            ),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -640,13 +863,22 @@ class B2BDashboardScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Распределение запасов',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF1E293B), letterSpacing: -0.5),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: Theme.of(context).colorScheme.onSurface,
+              letterSpacing: 0,
+            ),
           ),
-          const Text(
+          Text(
             'По категориям товаров',
-            style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           const SizedBox(height: 32),
           Row(
@@ -658,22 +890,24 @@ class B2BDashboardScreen extends StatelessWidget {
                   PieChartData(
                     sectionsSpace: 4,
                     centerSpaceRadius: 40,
-                    sections: sortedCategories.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final category = entry.value;
-                      final percentage = (category.value / totalStock) * 100;
-                      return PieChartSectionData(
-                        color: colors[index % colors.length],
-                        value: category.value.toDouble(),
-                        title: '${percentage.toStringAsFixed(0)}%',
-                        radius: 50,
-                        titleStyle: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      );
-                    }).toList(),
+                    sections:
+                        sortedCategories.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final category = entry.value;
+                          final percentage =
+                              (category.value / totalStock) * 100;
+                          return PieChartSectionData(
+                            color: colors[index % colors.length],
+                            value: category.value.toDouble(),
+                            title: '${percentage.toStringAsFixed(0)}%',
+                            radius: 50,
+                            titleStyle: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          );
+                        }).toList(),
                   ),
                 ),
               ),
@@ -681,34 +915,44 @@ class B2BDashboardScreen extends StatelessWidget {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: sortedCategories.take(4).toList().asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final category = entry.value;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8.0),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              color: colors[index % colors.length],
-                              shape: BoxShape.circle,
-                            ),
+                  children:
+                      sortedCategories.take(4).toList().asMap().entries.map((
+                        entry,
+                      ) {
+                        final index = entry.key;
+                        final category = entry.value;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8.0),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: colors[index % colors.length],
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  category.key,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color:
+                                        Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              category.key,
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
+                        );
+                      }).toList(),
                 ),
               ),
             ],
@@ -720,15 +964,25 @@ class B2BDashboardScreen extends StatelessWidget {
 
   Widget _buildBottomAnalyticsCard(List<B2BSaleModel> sales) {
     final now = DateTime.now();
-    final last7Days = List.generate(7, (index) => DateTime(now.year, now.month, now.day - (6 - index)));
-    
+    final last7Days = List.generate(
+      7,
+      (index) => DateTime(now.year, now.month, now.day - (6 - index)),
+    );
+
     double totalRevenue = 0;
-    final Map<DateTime, double> dailyRevenue = {for (var day in last7Days) day: 0};
+    final Map<DateTime, double> dailyRevenue = {
+      for (var day in last7Days) day: 0,
+    };
 
     for (var sale in sales) {
-      final saleDate = DateTime(sale.saleDate.year, sale.saleDate.month, sale.saleDate.day);
+      final saleDate = DateTime(
+        sale.saleDate.year,
+        sale.saleDate.month,
+        sale.saleDate.day,
+      );
       if (dailyRevenue.containsKey(saleDate)) {
-        dailyRevenue[saleDate] = (dailyRevenue[saleDate] ?? 0) + sale.totalAmount;
+        dailyRevenue[saleDate] =
+            (dailyRevenue[saleDate] ?? 0) + sale.totalAmount;
       }
       totalRevenue += sale.totalAmount;
     }
@@ -740,7 +994,8 @@ class B2BDashboardScreen extends StatelessWidget {
     }
 
     String growth = "+12%";
-    if (sales.length > 5) growth = "+${(sales.length * 1.5).toStringAsFixed(0)}%";
+    if (sales.length > 5)
+      growth = "+${(sales.length * 1.5).toStringAsFixed(0)}%";
 
     return Container(
       width: double.infinity,
@@ -771,11 +1026,20 @@ class B2BDashboardScreen extends StatelessWidget {
                 children: [
                   Text(
                     'Аналитика продаж',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: -0.5),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                      letterSpacing: 0,
+                    ),
                   ),
                   Text(
                     'Динамика за 7 дней (тыс. ₸)',
-                    style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500),
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
@@ -785,7 +1049,11 @@ class B2BDashboardScreen extends StatelessWidget {
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(Icons.trending_up_rounded, color: Colors.white, size: 20),
+                child: const Icon(
+                  Icons.trending_up_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
             ],
           ),
@@ -797,16 +1065,23 @@ class B2BDashboardScreen extends StatelessWidget {
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  getDrawingHorizontalLine: (value) => FlLine(
-                    color: Colors.white.withOpacity(0.1),
-                    strokeWidth: 1,
-                  ),
+                  getDrawingHorizontalLine:
+                      (value) => FlLine(
+                        color: Colors.white.withOpacity(0.1),
+                        strokeWidth: 1,
+                      ),
                 ),
                 titlesData: FlTitlesData(
                   show: true,
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  leftTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
@@ -814,7 +1089,8 @@ class B2BDashboardScreen extends StatelessWidget {
                       interval: 1,
                       getTitlesWidget: (value, meta) {
                         final index = value.toInt();
-                        if (index < 0 || index >= last7Days.length) return const SizedBox.shrink();
+                        if (index < 0 || index >= last7Days.length)
+                          return const SizedBox.shrink();
                         return Padding(
                           padding: const EdgeInsets.only(top: 10),
                           child: Text(
@@ -833,19 +1109,23 @@ class B2BDashboardScreen extends StatelessWidget {
                 borderData: FlBorderData(show: false),
                 lineBarsData: [
                   LineChartBarData(
-                    spots: spots.isNotEmpty ? spots : [const FlSpot(0, 0), const FlSpot(6, 0)],
+                    spots:
+                        spots.isNotEmpty
+                            ? spots
+                            : [const FlSpot(0, 0), const FlSpot(6, 0)],
                     isCurved: true,
                     color: Colors.white,
                     barWidth: 4,
                     isStrokeCapRound: true,
                     dotData: FlDotData(
                       show: true,
-                      getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
-                        radius: 4,
-                        color: const Color(0xFF10B981),
-                        strokeWidth: 2,
-                        strokeColor: Colors.white,
-                      ),
+                      getDotPainter:
+                          (spot, percent, barData, index) => FlDotCirclePainter(
+                            radius: 4,
+                            color: const Color(0xFF10B981),
+                            strokeWidth: 2,
+                            strokeColor: Colors.white,
+                          ),
                     ),
                     belowBarData: BarAreaData(
                       show: true,
@@ -866,7 +1146,10 @@ class B2BDashboardScreen extends StatelessWidget {
           const SizedBox(height: 24),
           Row(
             children: [
-              _bottomStat('${NumberFormat.compact().format(totalRevenue)} ₸', 'Общая выручка'),
+              _bottomStat(
+                '${NumberFormat.compact().format(totalRevenue)} ₸',
+                'Общая выручка',
+              ),
               const SizedBox(width: 40),
               _bottomStat(growth, 'Темп роста'),
             ],
@@ -882,11 +1165,19 @@ class B2BDashboardScreen extends StatelessWidget {
       children: [
         Text(
           value,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            fontSize: 18,
+          ),
         ),
         Text(
           label,
-          style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11, fontWeight: FontWeight.w500),
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.6),
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ],
     );

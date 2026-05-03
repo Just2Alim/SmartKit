@@ -28,6 +28,46 @@ class B2BReportsScreen extends StatelessWidget {
     return items.where((item) => item.stock <= item.minStock).length;
   }
 
+  int _expiringSoonCount(List<B2BInventoryModel> items) {
+    final now = DateTime.now();
+    return items.where((item) {
+      if (item.expiryDate == null) return false;
+      final daysLeft = item.expiryDate!.difference(now).inDays;
+      return daysLeft >= 0 && daysLeft <= 45;
+    }).length;
+  }
+
+  int _recentRevenue(List<B2BSaleModel> sales, {int days = 7}) {
+    final cutoff = DateTime.now().subtract(Duration(days: days));
+    return sales
+        .where((sale) => sale.saleDate.isAfter(cutoff))
+        .fold(0, (sum, sale) => sum + sale.totalAmount);
+  }
+
+  int _soldUnits(List<B2BSaleModel> sales, {int days = 7}) {
+    final cutoff = DateTime.now().subtract(Duration(days: days));
+    return sales.where((sale) => sale.saleDate.isAfter(cutoff)).fold(0, (
+      sum,
+      sale,
+    ) {
+      return sum +
+          sale.items.fold<int>(
+            0,
+            (itemSum, item) =>
+                itemSum + ((item['quantity'] as num?)?.toInt() ?? 1),
+          );
+    });
+  }
+
+  int _averageCheck(List<B2BSaleModel> sales, {int days = 7}) {
+    final cutoff = DateTime.now().subtract(Duration(days: days));
+    final recentSales =
+        sales.where((sale) => sale.saleDate.isAfter(cutoff)).toList();
+    if (recentSales.isEmpty) return 0;
+    final total = recentSales.fold(0, (sum, sale) => sum + sale.totalAmount);
+    return (total / recentSales.length).round();
+  }
+
   Map<String, int> _categoryStats(List<B2BInventoryModel> items) {
     final result = <String, int>{};
     for (final item in items) {
@@ -43,29 +83,35 @@ class B2BReportsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return const Scaffold(body: Center(child: Text('Пользователь не найден')));
+    if (user == null) {
+      return const Scaffold(
+        body: Center(child: Text('Пользователь не найден')),
+      );
+    }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: StreamBuilder<List<B2BInventoryModel>>(
         stream: _inventoryRepository.getItemsByUser(user.uid),
+        initialData: const [],
         builder: (context, inventorySnapshot) {
           return StreamBuilder<List<B2BSaleModel>>(
             stream: _salesRepository.getSalesByUser(user.uid),
+            initialData: const [],
             builder: (context, salesSnapshot) {
               return StreamBuilder<List<B2BLocationModel>>(
                 stream: _locationRepository.getLocationsByUser(user.uid),
+                initialData: const [],
                 builder: (context, locationsSnapshot) {
-                  if (inventorySnapshot.connectionState == ConnectionState.waiting ||
-                      salesSnapshot.connectionState == ConnectionState.waiting ||
-                      locationsSnapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator(color: Color(0xFF10B981)));
-                  }
-
                   final inventory = inventorySnapshot.data ?? [];
                   final sales = salesSnapshot.data ?? [];
                   final locations = locationsSnapshot.data ?? [];
                   final categoryStats = _categoryStats(inventory);
+                  final streamErrors = [
+                    if (inventorySnapshot.hasError) 'товары',
+                    if (salesSnapshot.hasError) 'продажи',
+                    if (locationsSnapshot.hasError) 'локации',
+                  ];
 
                   return CustomScrollView(
                     physics: const BouncingScrollPhysics(),
@@ -77,7 +123,13 @@ class B2BReportsScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildQuickStats(inventory),
+                              if (streamErrors.isNotEmpty) ...[
+                                _errorCard(
+                                  'Часть данных временно недоступна: ${streamErrors.join(', ')}',
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+                              _buildQuickStats(context, inventory, sales),
                               const SizedBox(height: 24),
                               B2BAiInsightsWidget(
                                 inventory: inventory,
@@ -85,22 +137,23 @@ class B2BReportsScreen extends StatelessWidget {
                                 locations: locations,
                               ),
                               const SizedBox(height: 32),
-                              const Text(
+                              Text(
                                 'Распределение запасов',
                                 style: TextStyle(
                                   fontSize: 22,
                                   fontWeight: FontWeight.w900,
-                                  color: Color(0xFF1E293B),
-                                  letterSpacing: -0.5,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
+                                  letterSpacing: 0,
                                 ),
                               ),
                               const SizedBox(height: 16),
                               if (categoryStats.isEmpty)
-                                _emptyCard('Нет данных по категориям')
+                                _emptyCard(context, 'Нет данных по категориям')
                               else
-                                _categoryChart(categoryStats),
+                                _categoryChart(context, categoryStats),
                               const SizedBox(height: 32),
-                              _buildSalesPerformance(sales),
+                              _buildSalesPerformance(context, sales),
                               const SizedBox(height: 40),
                             ],
                           ),
@@ -132,7 +185,7 @@ class B2BReportsScreen extends StatelessWidget {
             color: Colors.white,
             fontWeight: FontWeight.w900,
             fontSize: 20,
-            letterSpacing: -0.5,
+            letterSpacing: 0,
           ),
         ),
         background: Stack(
@@ -162,13 +215,18 @@ class B2BReportsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickStats(List<B2BInventoryModel> items) {
+  Widget _buildQuickStats(
+    BuildContext context,
+    List<B2BInventoryModel> items,
+    List<B2BSaleModel> sales,
+  ) {
     return Column(
       children: [
         Row(
           children: [
             Expanded(
               child: _statCard(
+                context: context,
                 title: 'Всего товаров',
                 value: items.length.toString(),
                 icon: Icons.inventory_2_rounded,
@@ -178,6 +236,7 @@ class B2BReportsScreen extends StatelessWidget {
             const SizedBox(width: 16),
             Expanded(
               child: _statCard(
+                context: context,
                 title: 'Общий остаток',
                 value: _totalStock(items).toString(),
                 icon: Icons.warehouse_rounded,
@@ -191,7 +250,8 @@ class B2BReportsScreen extends StatelessWidget {
           children: [
             Expanded(
               child: _statCard(
-                title: 'Общая стоимость',
+                context: context,
+                title: 'Стоимость склада',
                 value: _formatPrice(_totalValue(items)),
                 icon: Icons.payments_rounded,
                 color: const Color(0xFF8B5CF6),
@@ -200,10 +260,59 @@ class B2BReportsScreen extends StatelessWidget {
             const SizedBox(width: 16),
             Expanded(
               child: _statCard(
+                context: context,
                 title: 'Критический запас',
                 value: _criticalCount(items).toString(),
                 icon: Icons.warning_amber_rounded,
                 color: const Color(0xFFEF4444),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _statCard(
+                context: context,
+                title: 'Выручка 7 дней',
+                value: _formatPrice(_recentRevenue(sales)),
+                icon: Icons.trending_up_rounded,
+                color: const Color(0xFF0F766E),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _statCard(
+                context: context,
+                title: 'Средний чек',
+                value: _formatPrice(_averageCheck(sales)),
+                icon: Icons.receipt_long_rounded,
+                color: const Color(0xFFF59E0B),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _statCard(
+                context: context,
+                title: 'Продано 7 дней',
+                value: '${_soldUnits(sales)} ед.',
+                icon: Icons.shopping_bag_rounded,
+                color: const Color(0xFF2563EB),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _statCard(
+                context: context,
+                title: 'Срок до 45 дней',
+                value: _expiringSoonCount(items).toString(),
+                icon: Icons.event_busy_rounded,
+                color: const Color(0xFFDC2626),
               ),
             ),
           ],
@@ -213,6 +322,7 @@ class B2BReportsScreen extends StatelessWidget {
   }
 
   Widget _statCard({
+    required BuildContext context,
     required String title,
     required String value,
     required IconData icon,
@@ -221,16 +331,19 @@ class B2BReportsScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.08),
+            color: color.withValues(
+              alpha:
+                  Theme.of(context).brightness == Brightness.dark ? 0.18 : 0.08,
+            ),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
         ],
-        border: Border.all(color: color.withOpacity(0.05)),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -249,17 +362,17 @@ class B2BReportsScreen extends StatelessWidget {
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w900,
-              color: const Color(0xFF1E293B),
-              letterSpacing: -0.5,
+              color: Theme.of(context).colorScheme.onSurface,
+              letterSpacing: 0,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF64748B),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -267,92 +380,103 @@ class B2BReportsScreen extends StatelessWidget {
     );
   }
 
-  Widget _categoryChart(Map<String, int> stats) {
-    final entries = stats.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
+  Widget _categoryChart(BuildContext context, Map<String, int> stats) {
+    final entries =
+        stats.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
     final maxValue = entries.isEmpty ? 1 : entries.first.value;
+    if (maxValue <= 0) {
+      return _emptyCard(context, 'Остатки по категориям пока нулевые');
+    }
 
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF64748B).withOpacity(0.05),
+            color: Colors.black.withValues(
+              alpha:
+                  Theme.of(context).brightness == Brightness.dark ? 0.22 : 0.05,
+            ),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
         ],
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
-        children: entries.map((entry) {
-          final ratio = entry.value / maxValue;
-          final color = _getCategoryColor(entry.key);
+        children:
+            entries.map((entry) {
+              final ratio = entry.value / maxValue;
+              final color = _getCategoryColor(entry.key);
 
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      entry.key,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF334155),
-                      ),
-                    ),
-                    Text(
-                      '${entry.value} шт',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: color,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Stack(
-                  children: [
-                    Container(
-                      height: 12,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                    ),
-                    FractionallySizedBox(
-                      widthFactor: ratio,
-                      child: Container(
-                        height: 12,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [color, color.withOpacity(0.7)],
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          entry.key,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
-                          borderRadius: BorderRadius.circular(6),
-                          boxShadow: [
-                            BoxShadow(
-                              color: color.withOpacity(0.2),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
                         ),
-                      ),
+                        Text(
+                          '${entry.value} шт',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: color,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Stack(
+                      children: [
+                        Container(
+                          height: 12,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color:
+                                Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        FractionallySizedBox(
+                          widthFactor: ratio,
+                          child: Container(
+                            height: 12,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [color, color.withOpacity(0.7)],
+                              ),
+                              borderRadius: BorderRadius.circular(6),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: color.withOpacity(0.2),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          );
-        }).toList(),
+              );
+            }).toList(),
       ),
     );
   }
@@ -366,18 +490,44 @@ class B2BReportsScreen extends StatelessWidget {
     return const Color(0xFF6366F1);
   }
 
-  Widget _buildSalesPerformance(List<B2BSaleModel> sales) {
-    // Simple mock visualization of sales
+  Widget _buildSalesPerformance(
+    BuildContext context,
+    List<B2BSaleModel> sales,
+  ) {
+    final now = DateTime.now();
+    final days = List.generate(
+      7,
+      (index) => DateTime(now.year, now.month, now.day - (6 - index)),
+    );
+    final dailyRevenue = {for (final day in days) day: 0};
+
+    for (final sale in sales) {
+      final saleDay = DateTime(
+        sale.saleDate.year,
+        sale.saleDate.month,
+        sale.saleDate.day,
+      );
+      if (dailyRevenue.containsKey(saleDay)) {
+        dailyRevenue[saleDay] = (dailyRevenue[saleDay] ?? 0) + sale.totalAmount;
+      }
+    }
+
+    final maxRevenue = dailyRevenue.values.fold<int>(
+      0,
+      (max, value) => value > max ? value : max,
+    );
+    final weekdayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Динамика продаж',
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w900,
-            color: Color(0xFF1E293B),
-            letterSpacing: -0.5,
+            color: Theme.of(context).colorScheme.onSurface,
+            letterSpacing: 0,
           ),
         ),
         const SizedBox(height: 16),
@@ -390,48 +540,88 @@ class B2BReportsScreen extends StatelessWidget {
           ),
           child: Column(
             children: [
-              const Row(
+              Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Активность за неделю',
+                  const Text(
+                    'Выручка за неделю',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  Icon(Icons.trending_up_rounded, color: Color(0xFF10B981)),
+                  Text(
+                    _formatPrice(_recentRevenue(sales)),
+                    style: const TextStyle(
+                      color: Color(0xFF10B981),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 30),
               SizedBox(
-                height: 100,
+                height: 128,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: List.generate(7, (index) {
-                    final heightRatio = [0.4, 0.7, 0.5, 0.9, 0.6, 0.8, 0.5][index];
+                    final day = days[index];
+                    final revenue = dailyRevenue[day] ?? 0;
+                    final heightRatio =
+                        maxRevenue == 0
+                            ? 0.08
+                            : (revenue / maxRevenue).clamp(0.08, 1.0);
                     return Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
+                        Text(
+                          revenue == 0 ? '0' : '${(revenue / 1000).round()}к',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
                         Container(
                           width: 12,
-                          height: 80 * heightRatio,
+                          height: 76 * heightRatio,
                           decoration: BoxDecoration(
-                            color: index == 3 ? const Color(0xFF10B981) : Colors.white24,
+                            color:
+                                revenue > 0
+                                    ? const Color(0xFF10B981)
+                                    : Colors.white24,
                             borderRadius: BorderRadius.circular(6),
                           ),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][index],
-                          style: const TextStyle(color: Colors.white54, fontSize: 10),
+                          weekdayLabels[day.weekday - 1],
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 10,
+                          ),
                         ),
                       ],
                     );
                   }),
                 ),
+              ),
+              const SizedBox(height: 22),
+              Row(
+                children: [
+                  _salesFooterStat('${sales.length}', 'Заказов всего'),
+                  const SizedBox(width: 26),
+                  _salesFooterStat('${_soldUnits(sales)}', 'Ед. за 7 дней'),
+                  const SizedBox(width: 26),
+                  _salesFooterStat(
+                    _formatPrice(_averageCheck(sales)),
+                    'Средний чек',
+                  ),
+                ],
               ),
             ],
           ),
@@ -440,26 +630,87 @@ class B2BReportsScreen extends StatelessWidget {
     );
   }
 
-  Widget _emptyCard(String text) {
+  Widget _salesFooterStat(String value, String label) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 14,
+            ),
+          ),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white54,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyCard(BuildContext context, String text) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         children: [
-          Icon(Icons.analytics_outlined, size: 48, color: const Color(0xFFCBD5E1)),
+          Icon(
+            Icons.analytics_outlined,
+            size: 48,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(height: 16),
           Text(
             text,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: Color(0xFF64748B),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _errorCard(String text) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFFDE68A)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Color(0xFF92400E),
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],

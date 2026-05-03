@@ -31,17 +31,18 @@ class _B2BMainScreenState extends State<B2BMainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
-      ),
+      body: IndexedStack(index: _selectedIndex, children: _screens),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.cardColor,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(
+                alpha: theme.brightness == Brightness.dark ? 0.28 : 0.06,
+              ),
               blurRadius: 20,
               offset: const Offset(0, -5),
             ),
@@ -56,28 +57,48 @@ class _B2BMainScreenState extends State<B2BMainScreen> {
                 currentIndex: _selectedIndex,
                 onTap: _onItemTapped,
                 type: BottomNavigationBarType.fixed,
-                backgroundColor: Colors.white,
-                selectedItemColor: const Color(0xFF10B981),
-                unselectedItemColor: const Color(0xFF94A3B8),
+                backgroundColor: theme.cardColor,
+                selectedItemColor: scheme.primary,
+                unselectedItemColor: scheme.onSurfaceVariant,
                 showSelectedLabels: true,
                 showUnselectedLabels: true,
                 selectedLabelStyle: const TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 11,
-                  letterSpacing: -0.2,
+                  letterSpacing: 0,
                 ),
                 unselectedLabelStyle: const TextStyle(
                   fontWeight: FontWeight.w500,
                   fontSize: 11,
-                  letterSpacing: -0.2,
+                  letterSpacing: 0,
                 ),
                 elevation: 0,
                 items: [
                   _navItem(Icons.home_rounded, Icons.home_filled, 'Главная', 0),
-                  _navItem(Icons.inventory_2_outlined, Icons.inventory_2_rounded, 'Склад', 1),
-                  _navItem(Icons.history_outlined, Icons.history_rounded, 'Продажи', 2),
-                  _navItem(Icons.analytics_outlined, Icons.analytics_rounded, 'Отчёты', 3),
-                  _navItem(Icons.settings_outlined, Icons.settings_rounded, 'Настройки', 4),
+                  _navItem(
+                    Icons.inventory_2_outlined,
+                    Icons.inventory_2_rounded,
+                    'Склад',
+                    1,
+                  ),
+                  _navItem(
+                    Icons.history_outlined,
+                    Icons.history_rounded,
+                    'Продажи',
+                    2,
+                  ),
+                  _navItem(
+                    Icons.analytics_outlined,
+                    Icons.analytics_rounded,
+                    'Отчёты',
+                    3,
+                  ),
+                  _navItem(
+                    Icons.settings_outlined,
+                    Icons.settings_rounded,
+                    'Настройки',
+                    4,
+                  ),
                 ],
               ),
             ),
@@ -87,7 +108,12 @@ class _B2BMainScreenState extends State<B2BMainScreen> {
     );
   }
 
-  BottomNavigationBarItem _navItem(IconData icon, IconData activeIcon, String label, int index) {
+  BottomNavigationBarItem _navItem(
+    IconData icon,
+    IconData activeIcon,
+    String label,
+    int index,
+  ) {
     final isSelected = _selectedIndex == index;
     return BottomNavigationBarItem(
       icon: Padding(

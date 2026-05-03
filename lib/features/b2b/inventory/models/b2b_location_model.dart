@@ -43,8 +43,8 @@ class B2BLocationModel {
       name: data['name'] ?? '',
       type: data['type'] ?? 'Storage',
       address: data['address'] ?? '',
-      currentItems: data['currentItems'] ?? 0,
-      capacity: data['capacity'] ?? 0,
+      currentItems: (data['currentItems'] as num?)?.toInt() ?? 0,
+      capacity: (data['capacity'] as num?)?.toInt() ?? 0,
       status: data['status'] ?? 'Active',
     );
   }

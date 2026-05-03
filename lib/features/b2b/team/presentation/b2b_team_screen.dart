@@ -27,7 +27,7 @@ class B2BTeamScreen extends StatelessWidget {
     ];
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
@@ -35,16 +35,13 @@ class B2BTeamScreen extends StatelessWidget {
           SliverPadding(
             padding: const EdgeInsets.all(20),
             sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final member = team[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: _TeamMemberCard(member: member),
-                  );
-                },
-                childCount: team.length,
-              ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final member = team[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: _TeamMemberCard(member: member),
+                );
+              }, childCount: team.length),
             ),
           ),
           SliverToBoxAdapter(
@@ -53,14 +50,21 @@ class B2BTeamScreen extends StatelessWidget {
               child: OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
                 ),
                 onPressed: () {},
                 icon: const Icon(Icons.add_rounded, color: Color(0xFF10B981)),
-                label: const Text(
+                label: Text(
                   'Добавить сотрудника',
-                  style: TextStyle(color: Color(0xFF1E293B), fontWeight: FontWeight.w800),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ),
@@ -84,7 +88,7 @@ class B2BTeamScreen extends StatelessWidget {
             color: Colors.white,
             fontWeight: FontWeight.w900,
             fontSize: 20,
-            letterSpacing: -0.5,
+            letterSpacing: 0,
           ),
         ),
         background: Container(
@@ -109,12 +113,19 @@ class _TeamMemberCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: Colors.black.withValues(
+              alpha:
+                  Theme.of(context).brightness == Brightness.dark ? 0.22 : 0.04,
+            ),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
-        border: Border.all(color: const Color(0xFFF1F5F9)),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
@@ -123,7 +134,7 @@ class _TeamMemberCard extends StatelessWidget {
             height: 56,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFF1F5F9), Color(0xFFE2E8F0)],
+                colors: [Color(0xFFD1FAE5), Color(0xFFA7F3D0)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -132,8 +143,8 @@ class _TeamMemberCard extends StatelessWidget {
             child: Center(
               child: Text(
                 member['initials']!,
-                style: const TextStyle(
-                  color: Color(0xFF64748B),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
                   fontWeight: FontWeight.w900,
                   fontSize: 18,
                 ),
@@ -147,10 +158,10 @@ class _TeamMemberCard extends StatelessWidget {
               children: [
                 Text(
                   member['name']!,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
-                    color: Color(0xFF1E293B),
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -165,9 +176,9 @@ class _TeamMemberCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   member['email']!,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF94A3B8),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
                   ),
                 ),

@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../constants/app_colors.dart';
+
 class AppBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int>? onTap;
 
-  const AppBottomNavBar({
-    super.key,
-    required this.currentIndex,
-    this.onTap,
-  });
+  const AppBottomNavBar({super.key, required this.currentIndex, this.onTap});
 
   void _onTap(BuildContext context, int index) {
     if (index == currentIndex) return;
@@ -20,6 +18,7 @@ class AppBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final items = <_NavItem>[
       const _NavItem(icon: Icons.home_rounded, label: 'Главная'),
       const _NavItem(icon: Icons.medication_rounded, label: 'Лекарства'),
@@ -31,12 +30,12 @@ class AppBottomNavBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 18),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
+        color: AppColors.card(context),
         boxShadow: [
           BoxShadow(
             blurRadius: 16,
             offset: const Offset(0, -4),
-            color: Colors.black.withOpacity(0.05),
+            color: AppColors.shadow(context),
           ),
         ],
       ),
@@ -59,7 +58,9 @@ class AppBottomNavBar extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color:
-                        isActive ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.15) : Colors.transparent,
+                        isActive
+                            ? scheme.primary.withValues(alpha: 0.15)
+                            : Colors.transparent,
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: Column(
@@ -70,8 +71,10 @@ class AppBottomNavBar extends StatelessWidget {
                         size: 22,
                         color:
                             isActive
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                                ? scheme.primary
+                                : scheme.onSurfaceVariant.withValues(
+                                  alpha: 0.74,
+                                ),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -84,8 +87,10 @@ class AppBottomNavBar extends StatelessWidget {
                               isActive ? FontWeight.w700 : FontWeight.w500,
                           color:
                               isActive
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                                  ? scheme.primary
+                                  : scheme.onSurfaceVariant.withValues(
+                                    alpha: 0.74,
+                                  ),
                         ),
                       ),
                     ],

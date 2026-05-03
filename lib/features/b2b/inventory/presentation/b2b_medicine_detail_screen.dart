@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/router/app_routes.dart';
 import '../data/b2b_inventory_repository.dart';
 import '../models/b2b_inventory_model.dart';
 
 class B2BMedicineDetailScreen extends StatefulWidget {
   final String medicineId;
 
-  const B2BMedicineDetailScreen({
-    super.key,
-    required this.medicineId,
-  });
+  const B2BMedicineDetailScreen({super.key, required this.medicineId});
 
   @override
   State<B2BMedicineDetailScreen> createState() =>
@@ -38,6 +36,10 @@ class _B2BMedicineDetailScreenState extends State<B2BMedicineDetailScreen> {
 
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+  }
+
+  String _formatOptionalDate(DateTime? date) {
+    return date == null ? 'Не указан' : _formatDate(date);
   }
 
   Future<void> _deleteItem() async {
@@ -73,17 +75,17 @@ class _B2BMedicineDetailScreenState extends State<B2BMedicineDetailScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Товар удалён')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Товар удалён')));
 
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка удаления: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Ошибка удаления: $e')));
     } finally {
       if (mounted) {
         setState(() => isDeleting = false);
@@ -94,12 +96,14 @@ class _B2BMedicineDetailScreenState extends State<B2BMedicineDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: FutureBuilder<B2BInventoryModel?>(
         future: _repository.getItemById(widget.medicineId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: Color(0xFF10B981)));
+            return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF10B981)),
+            );
           }
 
           if (snapshot.hasError) {
@@ -107,9 +111,16 @@ class _B2BMedicineDetailScreenState extends State<B2BMedicineDetailScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline_rounded, size: 48, color: Colors.red),
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    size: 48,
+                    color: Colors.red,
+                  ),
                   const SizedBox(height: 16),
-                  Text('Ошибка: ${snapshot.error}', style: const TextStyle(color: Color(0xFF64748B))),
+                  Text(
+                    'Ошибка: ${snapshot.error}',
+                    style: const TextStyle(color: Color(0xFF64748B)),
+                  ),
                 ],
               ),
             );
@@ -119,7 +130,10 @@ class _B2BMedicineDetailScreenState extends State<B2BMedicineDetailScreen> {
 
           if (item == null) {
             return const Center(
-              child: Text('Товар не найден', style: TextStyle(color: Color(0xFF64748B))),
+              child: Text(
+                'Товар не найден',
+                style: TextStyle(color: Color(0xFF64748B)),
+              ),
             );
           }
 
@@ -142,9 +156,40 @@ class _B2BMedicineDetailScreenState extends State<B2BMedicineDetailScreen> {
                       color: Colors.black.withOpacity(0.2),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                    child: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                   ),
                 ),
+                actions: [
+                  IconButton(
+                    onPressed: () async {
+                      final updated = await Navigator.pushNamed(
+                        context,
+                        AppRoutes.b2bAddMedicine,
+                        arguments: item.id,
+                      );
+                      if (updated == true && mounted) {
+                        setState(() {});
+                      }
+                    },
+                    icon: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.edit_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 flexibleSpace: FlexibleSpaceBar(
                   stretchModes: const [
                     StretchMode.zoomBackground,
@@ -158,10 +203,7 @@ class _B2BMedicineDetailScreenState extends State<B2BMedicineDetailScreen> {
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
-                            colors: [
-                              statusColor.withOpacity(0.8),
-                              statusColor,
-                            ],
+                            colors: [statusColor.withOpacity(0.8), statusColor],
                           ),
                         ),
                       ),
@@ -188,9 +230,11 @@ class _B2BMedicineDetailScreenState extends State<B2BMedicineDetailScreen> {
               ),
               SliverToBoxAdapter(
                 child: Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(32),
+                    ),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(24, 28, 24, 40),
@@ -207,19 +251,25 @@ class _B2BMedicineDetailScreenState extends State<B2BMedicineDetailScreen> {
                                 children: [
                                   Text(
                                     item.name,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 28,
                                       fontWeight: FontWeight.w900,
-                                      color: Color(0xFF1E293B),
-                                      letterSpacing: -0.5,
+                                      color:
+                                          Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface,
+                                      letterSpacing: 0,
                                     ),
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
                                     item.category,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 16,
-                                      color: Color(0xFF64748B),
+                                      color:
+                                          Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -230,16 +280,16 @@ class _B2BMedicineDetailScreenState extends State<B2BMedicineDetailScreen> {
                           ],
                         ),
                         const SizedBox(height: 32),
-                        
+
                         _sectionTitle('Информация о товаре'),
                         const SizedBox(height: 16),
                         _infoGrid(item),
-                        
+
                         const SizedBox(height: 32),
                         _sectionTitle('Управление запасами'),
                         const SizedBox(height: 16),
                         _stockControlCard(item),
-                        
+
                         const SizedBox(height: 40),
                         SizedBox(
                           width: double.infinity,
@@ -251,20 +301,23 @@ class _B2BMedicineDetailScreenState extends State<B2BMedicineDetailScreen> {
                               elevation: 0,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(20),
-                                side: const BorderSide(color: Color(0xFFFECDD3)),
+                                side: const BorderSide(
+                                  color: Color(0xFFFECDD3),
+                                ),
                               ),
                             ),
                             onPressed: isDeleting ? null : _deleteItem,
-                            icon: isDeleting
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Color(0xFFE11D48),
-                                    ),
-                                  )
-                                : const Icon(Icons.delete_outline_rounded),
+                            icon:
+                                isDeleting
+                                    ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Color(0xFFE11D48),
+                                      ),
+                                    )
+                                    : const Icon(Icons.delete_outline_rounded),
                             label: Text(
                               isDeleting ? 'Удаление...' : 'Удалить из базы',
                               style: const TextStyle(
@@ -289,11 +342,11 @@ class _B2BMedicineDetailScreenState extends State<B2BMedicineDetailScreen> {
   Widget _sectionTitle(String title) {
     return Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.w800,
-        color: Color(0xFF1E293B),
-        letterSpacing: -0.3,
+        color: Theme.of(context).colorScheme.onSurface,
+        letterSpacing: 0,
       ),
     );
   }
@@ -308,9 +361,34 @@ class _B2BMedicineDetailScreenState extends State<B2BMedicineDetailScreen> {
       childAspectRatio: 2.2,
       children: [
         _gridItem('Цена', _formatPrice(item.price), Icons.payments_outlined),
-        _gridItem('Текущий остаток', '${item.stock} шт', Icons.inventory_2_outlined),
+        _gridItem(
+          'Текущий остаток',
+          '${item.stock} шт',
+          Icons.inventory_2_outlined,
+        ),
         _gridItem('Минимум', '${item.minStock} шт', Icons.low_priority_rounded),
-        _gridItem('Создано', _formatDate(item.createdAt), Icons.calendar_today_outlined),
+        if ((item.dosage ?? '').isNotEmpty)
+          _gridItem('Дозировка', item.dosage!, Icons.science_outlined),
+        if ((item.packageSize ?? '').isNotEmpty)
+          _gridItem('Упаковка', item.packageSize!, Icons.all_inbox_outlined),
+        if ((item.manufacturer ?? '').isNotEmpty)
+          _gridItem(
+            'Производитель',
+            item.manufacturer!,
+            Icons.factory_outlined,
+          ),
+        if ((item.batchNumber ?? '').isNotEmpty)
+          _gridItem('Серия', item.batchNumber!, Icons.qr_code_2_rounded),
+        _gridItem(
+          'Срок годности',
+          _formatOptionalDate(item.expiryDate),
+          Icons.event_available_outlined,
+        ),
+        _gridItem(
+          'Создано',
+          _formatDate(item.createdAt),
+          Icons.calendar_today_outlined,
+        ),
       ],
     );
   }
@@ -319,13 +397,17 @@ class _B2BMedicineDetailScreenState extends State<B2BMedicineDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: const Color(0xFF64748B)),
+          Icon(
+            icon,
+            size: 18,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -334,11 +416,19 @@ class _B2BMedicineDetailScreenState extends State<B2BMedicineDetailScreen> {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 Text(
                   value,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
               ],
             ),
@@ -386,7 +476,11 @@ class _B2BMedicineDetailScreenState extends State<B2BMedicineDetailScreen> {
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: LinearProgressIndicator(
-              value: item.stock / (item.minStock * 4).clamp(item.stock, double.infinity).toDouble(),
+              value:
+                  item.stock /
+                  (item.minStock * 4)
+                      .clamp(item.stock, double.infinity)
+                      .toDouble(),
               backgroundColor: color.withOpacity(0.1),
               valueColor: AlwaysStoppedAnimation(color),
               minHeight: 8,
