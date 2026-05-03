@@ -1262,7 +1262,7 @@ class B2BDashboardScreen extends StatelessWidget {
                 Text(
                   item.name,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Colors.black,
                     fontWeight: FontWeight.w700,
                     fontSize: 15,
                   ),
@@ -1270,7 +1270,7 @@ class B2BDashboardScreen extends StatelessWidget {
                 Text(
                   '${item.category} • ${item.stock} шт.',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.5),
+                    color: Colors.black.withOpacity(0.5),
                     fontSize: 12,
                   ),
                 ),

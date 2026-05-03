@@ -93,7 +93,6 @@ class _MedicineDetailScreenState extends State<MedicineDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-
       appBar: AppBar(title: const Text('Детали лекарства')),
       body: FutureBuilder<MedicineModel?>(
         future: _repository.getMedicineById(widget.medicineId),
@@ -197,6 +196,16 @@ class _MedicineDetailScreenState extends State<MedicineDetailScreen> {
                 _infoCard(
                   title: 'Дополнительно',
                   children: [
+                    if ((medicine.barcode ?? '').isNotEmpty)
+                      _infoRow('Штрих-код', medicine.barcode!),
+                    if ((medicine.manufacturer ?? '').isNotEmpty)
+                      _infoRow('Производитель', medicine.manufacturer!),
+                    if ((medicine.packageSize ?? '').isNotEmpty)
+                      _infoRow('Упаковка', medicine.packageSize!),
+                    if ((medicine.batchNumber ?? '').isNotEmpty)
+                      _infoRow('Серия/партия', medicine.batchNumber!),
+                    if ((medicine.scanSource ?? '').isNotEmpty)
+                      _infoRow('Источник', medicine.scanSource!),
                     _infoRow(
                       'Заметки',
                       medicine.notes == null || medicine.notes!.isEmpty
@@ -313,7 +322,10 @@ class _MedicineDetailScreenState extends State<MedicineDetailScreen> {
             flex: 4,
             child: Text(
               label,
-              style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
           Expanded(

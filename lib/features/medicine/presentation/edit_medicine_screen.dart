@@ -34,11 +34,26 @@ class _EditMedicineScreenState extends State<EditMedicineScreen> {
 
   final categories = const [
     'Обезболивающее',
+    'Жаропонижающее',
     'Антибиотик',
     'Витамины',
     'Противовоспалительное',
+    'Антисептик',
+    'От аллергии',
+    'ЖКТ',
+    'Сорбенты',
+    'Противовирусное',
+    'От простуды',
     'Другое',
   ];
+
+  List<String> get _categoryOptions {
+    final options = [...categories];
+    if (!options.contains(selectedCategory)) {
+      options.add(selectedCategory);
+    }
+    return options;
+  }
 
   @override
   void initState() {
@@ -194,7 +209,6 @@ class _EditMedicineScreenState extends State<EditMedicineScreen> {
     ];
 
     return Scaffold(
-
       appBar: AppBar(title: const Text('Редактировать лекарство')),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -263,7 +277,7 @@ class _EditMedicineScreenState extends State<EditMedicineScreen> {
                     value: selectedCategory,
                     isExpanded: true,
                     items:
-                        categories
+                        _categoryOptions
                             .map(
                               (category) => DropdownMenuItem(
                                 value: category,

@@ -11,6 +11,11 @@ class MedicineModel {
   final String? notes;
   final DateTime? expiryDate;
   final DateTime createdAt;
+  final String? barcode;
+  final String? manufacturer;
+  final String? packageSize;
+  final String? batchNumber;
+  final String? scanSource;
 
   MedicineModel({
     required this.id,
@@ -23,6 +28,11 @@ class MedicineModel {
     this.notes,
     this.expiryDate,
     required this.createdAt,
+    this.barcode,
+    this.manufacturer,
+    this.packageSize,
+    this.batchNumber,
+    this.scanSource,
   });
 
   Map<String, dynamic> toMap() {
@@ -36,6 +46,11 @@ class MedicineModel {
       'notes': notes,
       'expiryDate': expiryDate != null ? Timestamp.fromDate(expiryDate!) : null,
       'createdAt': Timestamp.fromDate(createdAt),
+      'barcode': barcode,
+      'manufacturer': manufacturer,
+      'packageSize': packageSize,
+      'batchNumber': batchNumber,
+      'scanSource': scanSource,
     };
   }
 
@@ -58,6 +73,11 @@ class MedicineModel {
           data['createdAt'] != null
               ? (data['createdAt'] as Timestamp).toDate()
               : DateTime.now(),
+      barcode: data['barcode'],
+      manufacturer: data['manufacturer'],
+      packageSize: data['packageSize'],
+      batchNumber: data['batchNumber'],
+      scanSource: data['scanSource'],
     );
   }
 }

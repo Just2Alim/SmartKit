@@ -24,6 +24,7 @@
 - [x] **AI Reliability & Safety Pass**: Added centralized medical/business guardrails, Ollama endpoint fallbacks, deterministic offline answers, and B2B analytics fallback so AI cards no longer surface raw Ollama connection errors.
 - [x] **AI Language Consistency**: Added latest-message language detection, strict per-request language instructions, mixed-language repair retries, and localized AI fallbacks for B2C, B2B, Gemini reserve, and AI kit cart summaries.
 - [x] **AI Kit Builder & Cart Handoff**: Rebuilt B2C kit assembly around user needs, current home medicines, live Firestore catalog matching, missing-item warnings, confirmation buttons, cart creation, and cart navigation.
+- [x] **Universal Barcode & Package Scan**: Reworked B2C medicine scanning so unknown barcodes become editable drafts, public/learned/B2B lookup sources are checked, package OCR fills dosage/expiry/batch/package fields, and saved scans teach the Firestore barcode cache.
 - [ ] **Activity Detail/Navigation**: Add a dedicated screen to view the full history of activities, including filtering by type.
 
 ## Completed Work
@@ -34,6 +35,11 @@
   - Replaced raw Ollama connection errors with useful offline responses for B2C inventory/symptom questions and B2B stock/sales/location analysis.
   - Added a B2C kit planner that uses the user's current medicines and live B2B catalog to avoid duplicates, skip restricted categories, flag missing essentials, and build a safe purchasable plan.
   - Connected AI chat and the kit builder screen to confirmation-based cart creation and automatic navigation to the cart.
+- **B2C Barcode & Package OCR**:
+  - Replaced the hard-stop local barcode dictionary flow with layered lookup: learned SmartKit barcode cache, B2B inventory, Open Products Facts, Open Food Facts, OpenFDA, then local fallback.
+  - Unknown barcodes now return a safe draft instead of an error, preserving the code and prompting package OCR.
+  - Added package OCR to the B2C add-medicine form for dosage, expiry date, package size, batch number, manufacturer, barcode, and category autofill.
+  - Persisted barcode/manufacturer/package/batch/scan source metadata in user medicines and details.
 - **Unified Design System & Dark Mode**:
   - Expanded `AppTheme` with full light/dark color schemes, text styles, button, card, input, chip, navigation, dialog, and snackbar theming.
   - Expanded `AppColors` with brand, dark-surface, semantic, border, shadow, and adaptive helper tokens.

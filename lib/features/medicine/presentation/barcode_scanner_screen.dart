@@ -4,7 +4,6 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import '../../../core/services/barcode_service.dart';
-import '../../../core/router/app_routes.dart';
 
 class BarcodeScannerScreen extends StatefulWidget {
   const BarcodeScannerScreen({super.key});
@@ -13,14 +12,15 @@ class BarcodeScannerScreen extends StatefulWidget {
   State<BarcodeScannerScreen> createState() => _BarcodeScannerScreenState();
 }
 
-class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with SingleTickerProviderStateMixin {
+class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
+    with SingleTickerProviderStateMixin {
   final MobileScannerController controller = MobileScannerController(
     formats: [BarcodeFormat.all],
     detectionSpeed: DetectionSpeed.normal,
     facing: CameraFacing.back,
     torchEnabled: false,
   );
-  
+
   late AnimationController _animationController;
   bool _isScanning = false; // To prevent multiple simultaneous lookups
 
@@ -31,9 +31,6 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
-    
-    // Explicitly start the controller
-    controller.start();
   }
 
   @override
@@ -64,122 +61,134 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
     }
   }
 
-  void _handleBarcode(String barcode) async {
+  Future<void> _handleBarcode(String barcode) async {
     setState(() => _isScanning = true);
-    
-    // Visual feedback: simple flash effect
-    _showFlashEffect();
-    
+
     _showLoadingDialog();
-    
+
     try {
       final medicineInfo = await BarcodeService.lookupBarcode(barcode);
-      
+
       if (!mounted) return;
       Navigator.of(context).pop(); // Close loading dialog
 
       if (medicineInfo != null) {
-        print('DEBUG: Medicine found: ${medicineInfo['name']}');
+        debugPrint('DEBUG: Medicine found: ${medicineInfo['name']}');
         // Return result instead of navigating directly
         Navigator.pop(context, medicineInfo);
       } else {
-        print('DEBUG: Medicine not found for barcode: $barcode');
-        _showNotFoundDialog(barcode);
+        debugPrint('DEBUG: Medicine not found for barcode: $barcode');
+        _showBarcodeDraftDialog(barcode);
       }
     } catch (e) {
-      print('DEBUG: Error looking up barcode: $e');
+      debugPrint('DEBUG: Error looking up barcode: $e');
       if (mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка при поиске: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Ошибка при поиске: $e')));
         setState(() => _isScanning = false);
       }
     }
-  }
-
-  void _showFlashEffect() {
-    // We can simulate a flash by overlaying a white container for a split second
-    showDialog(
-      context: context,
-      barrierColor: Colors.white.withOpacity(0.5),
-      builder: (context) {
-        Future.delayed(const Duration(milliseconds: 100), () {
-          if (Navigator.canPop(context)) Navigator.pop(context);
-        });
-        return const SizedBox.expand();
-      },
-    );
   }
 
   void _showLoadingDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => Center(
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              padding: const EdgeInsets.all(30),
-              color: Colors.white.withOpacity(0.1),
-              child: const CircularProgressIndicator(color: Color(0xFF6366F1)),
+      builder:
+          (context) => Center(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(
+                  padding: const EdgeInsets.all(30),
+                  color: Colors.white.withValues(alpha: 0.1),
+                  child: const CircularProgressIndicator(
+                    color: Color(0xFF6366F1),
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
-      ),
     );
   }
 
-  void _showNotFoundDialog(String barcode) {
+  void _showBarcodeDraftDialog(String barcode) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E2E),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Не найдено', style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Штрих-код $barcode не найден в базе данных. Хотите добавить вручную?',
-              style: const TextStyle(color: Colors.white70),
+      builder:
+          (context) => AlertDialog(
+            backgroundColor: const Color(0xFF1E1E2E),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
             ),
-            const SizedBox(height: 16),
-            TextButton.icon(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: barcode));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Штрих-код скопирован')),
-                );
-              },
-              icon: const Icon(Icons.copy_rounded, size: 18, color: Color(0xFF6366F1)),
-              label: const Text('Копировать код', style: TextStyle(color: Color(0xFF6366F1))),
+            title: const Text(
+              'Штрих-код считан',
+              style: TextStyle(color: Colors.white),
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() => _isScanning = false);
-            },
-            child: const Text('Отмена', style: TextStyle(color: Colors.grey)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Код $barcode сохранится в карточке. Если справочник не нашел название, досканируйте упаковку на следующем экране.',
+                  style: const TextStyle(color: Colors.white70),
+                ),
+                const SizedBox(height: 16),
+                TextButton.icon(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: barcode));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Штрих-код скопирован')),
+                    );
+                  },
+                  icon: const Icon(
+                    Icons.copy_rounded,
+                    size: 18,
+                    color: Color(0xFF6366F1),
+                  ),
+                  label: const Text(
+                    'Копировать код',
+                    style: TextStyle(color: Color(0xFF6366F1)),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  setState(() => _isScanning = false);
+                },
+                child: const Text(
+                  'Отмена',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6366F1),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pop(context); // Close dialog
+                  Navigator.pop(context, {
+                    'barcode': barcode,
+                    'category': 'Другое',
+                    'source': 'Barcode only',
+                    'needsPackageScan': true,
+                    'isUnknown': true,
+                    'lookupMessage':
+                        'Справочник не нашел карточку. Сфотографируйте упаковку, чтобы распознать название, дозировку и срок.',
+                  }); // Close scanner
+                },
+                child: const Text('Продолжить'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6366F1),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context, {'manual': true}); // Close scanner
-            },
-            child: const Text('Добавить вручную'),
-          ),
-        ],
-      ),
     ).then((_) {
       if (mounted) {
         setState(() => _isScanning = false);
@@ -199,12 +208,16 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
             fit: BoxFit.cover,
             onDetect: _onDetect,
             errorBuilder: (context, error, child) {
-              print('DEBUG: Scanner Error: ${error.errorCode}');
+              debugPrint('DEBUG: Scanner Error: ${error.errorCode}');
               return Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.no_photography_outlined, color: Colors.white54, size: 80),
+                    const Icon(
+                      Icons.no_photography_outlined,
+                      color: Colors.white54,
+                      size: 80,
+                    ),
                     const SizedBox(height: 20),
                     Text(
                       'Ошибка камеры: ${error.errorCode}',
@@ -225,7 +238,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
           Positioned.fill(
             child: ColorFiltered(
               colorFilter: ColorFilter.mode(
-                Colors.black.withOpacity(0.7),
+                Colors.black.withValues(alpha: 0.7),
                 BlendMode.srcOut,
               ),
               child: Stack(
@@ -275,13 +288,19 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
                           decoration: BoxDecoration(
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF6366F1).withOpacity(0.8),
+                                color: const Color(
+                                  0xFF6366F1,
+                                ).withValues(alpha: 0.8),
                                 blurRadius: 10,
                                 spreadRadius: 2,
                               ),
                             ],
                             gradient: const LinearGradient(
-                              colors: [Colors.transparent, Color(0xFF6366F1), Colors.transparent],
+                              colors: [
+                                Colors.transparent,
+                                Color(0xFF6366F1),
+                                Colors.transparent,
+                              ],
                             ),
                           ),
                         ),
@@ -313,7 +332,9 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
                           onTap: () {
                             const testBarcode = '4607027766347'; // Nurofen
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Тестовое сканирование: Нурофен')),
+                              const SnackBar(
+                                content: Text('Тестовое сканирование: Нурофен'),
+                              ),
                             );
                             _handleBarcode(testBarcode);
                           },
@@ -323,7 +344,10 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
                         valueListenable: controller,
                         builder: (context, state, child) {
                           return _buildGlassButton(
-                            icon: state.torchState == TorchState.on ? Icons.flash_on : Icons.flash_off,
+                            icon:
+                                state.torchState == TorchState.on
+                                    ? Icons.flash_on
+                                    : Icons.flash_off,
                             onTap: () => controller.toggleTorch(),
                             isActive: state.torchState == TorchState.on,
                           );
@@ -367,11 +391,16 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
                         Navigator.pop(context, {'manual': true});
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 18,
+                        ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
+                          color: Colors.white.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withOpacity(0.2)),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.2),
+                          ),
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
@@ -411,16 +440,31 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
         height: 30,
         decoration: BoxDecoration(
           border: Border(
-            top: y == 0 ? const BorderSide(color: Color(0xFF6366F1), width: 4) : BorderSide.none,
-            bottom: y == 1 ? const BorderSide(color: Color(0xFF6366F1), width: 4) : BorderSide.none,
-            left: x == 0 ? const BorderSide(color: Color(0xFF6366F1), width: 4) : BorderSide.none,
-            right: x == 1 ? const BorderSide(color: Color(0xFF6366F1), width: 4) : BorderSide.none,
+            top:
+                y == 0
+                    ? const BorderSide(color: Color(0xFF6366F1), width: 4)
+                    : BorderSide.none,
+            bottom:
+                y == 1
+                    ? const BorderSide(color: Color(0xFF6366F1), width: 4)
+                    : BorderSide.none,
+            left:
+                x == 0
+                    ? const BorderSide(color: Color(0xFF6366F1), width: 4)
+                    : BorderSide.none,
+            right:
+                x == 1
+                    ? const BorderSide(color: Color(0xFF6366F1), width: 4)
+                    : BorderSide.none,
           ),
           borderRadius: BorderRadius.only(
             topLeft: x == 0 && y == 0 ? const Radius.circular(20) : Radius.zero,
-            topRight: x == 1 && y == 0 ? const Radius.circular(20) : Radius.zero,
-            bottomLeft: x == 0 && y == 1 ? const Radius.circular(20) : Radius.zero,
-            bottomRight: x == 1 && y == 1 ? const Radius.circular(20) : Radius.zero,
+            topRight:
+                x == 1 && y == 0 ? const Radius.circular(20) : Radius.zero,
+            bottomLeft:
+                x == 0 && y == 1 ? const Radius.circular(20) : Radius.zero,
+            bottomRight:
+                x == 1 && y == 1 ? const Radius.circular(20) : Radius.zero,
           ),
         ),
       ),
@@ -442,14 +486,11 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
+              color: Colors.white.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.2)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
             ),
-            child: Icon(
-              icon,
-              color: isActive ? Colors.yellow : Colors.white,
-            ),
+            child: Icon(icon, color: isActive ? Colors.yellow : Colors.white),
           ),
         ),
       ),

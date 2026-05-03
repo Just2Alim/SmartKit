@@ -56,8 +56,13 @@ class MedicineRepository {
     String? notes,
     String? familyMemberId,
     DateTime? expiryDate,
+    String? barcode,
+    String? manufacturer,
+    String? packageSize,
+    String? batchNumber,
+    String? scanSource,
   }) async {
-    await _medicinesCollection.doc(medicineId).update({
+    final updates = <String, dynamic>{
       'name': name,
       'dosage': dosage,
       'quantity': quantity,
@@ -65,7 +70,15 @@ class MedicineRepository {
       'notes': notes,
       'familyMemberId': familyMemberId,
       'expiryDate': expiryDate != null ? Timestamp.fromDate(expiryDate) : null,
-    });
+    };
+
+    if (barcode != null) updates['barcode'] = barcode;
+    if (manufacturer != null) updates['manufacturer'] = manufacturer;
+    if (packageSize != null) updates['packageSize'] = packageSize;
+    if (batchNumber != null) updates['batchNumber'] = batchNumber;
+    if (scanSource != null) updates['scanSource'] = scanSource;
+
+    await _medicinesCollection.doc(medicineId).update(updates);
   }
 
   Future<void> deleteMedicine(String medicineId) async {

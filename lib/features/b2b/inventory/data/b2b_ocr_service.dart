@@ -25,26 +25,16 @@ class B2BOcrService {
             .toList();
 
     final joined = lines.join(' ');
+    final dosage = _extractDosage(joined);
+    final packageSize = _extractPackageSize(joined);
 
     return B2BOcrResult(
       rawText: normalizedText.trim(),
       name: _extractName(lines),
       category: _extractCategory(joined),
       manufacturer: _extractManufacturer(lines, joined),
-      dosage: _firstMatch(
-        joined,
-        RegExp(
-          r'\b\d+(?:[,.]\d+)?\s*(?:mg|мг|g|г|mcg|мкг|ml|мл|iu|ме|%)\b',
-          caseSensitive: false,
-        ),
-      ),
-      packageSize: _firstMatch(
-        joined,
-        RegExp(
-          r'\b(?:№|n|no\.?|x)?\s?\d{1,4}\s*(?:табл\.?|капс\.?|caps?|tablets?|амп\.?|флак\.?|саше|шт\.?)\b',
-          caseSensitive: false,
-        ),
-      ),
+      dosage: dosage,
+      packageSize: packageSize,
       barcode: _firstMatch(joined, RegExp(r'\b\d{8,14}\b')),
       batchNumber: _extractBatch(joined),
       expiryDate: _extractExpiryDate(joined),
@@ -63,7 +53,13 @@ class B2BOcrService {
             .where((line) => RegExp(r'[A-Za-zА-Яа-я]').hasMatch(line))
             .where(
               (line) =>
-                  line.replaceAll(RegExp(r'[^A-Za-zА-Яа-я]'), '').length >= 4,
+                  line
+                      .replaceAll(
+                        RegExp(r'[^A-Za-zА-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі]'),
+                        '',
+                      )
+                      .length >=
+                  4,
             )
             .toList();
 
@@ -90,6 +86,11 @@ class B2BOcrService {
         'ketorol',
         'кеторол',
         'nurofen',
+        'нурофен',
+        'analgin',
+        'анальгин',
+        'aspirin',
+        'аспирин',
       ],
       'Антибиотик': [
         'amoxicillin',
@@ -106,8 +107,36 @@ class B2BOcrService {
         'мирамистин',
         'antiseptic',
       ],
-      'Аллергия': ['allergy', 'аллерг', 'suprastin', 'супрастин', 'loratadine'],
-      'ЖКТ': ['smecta', 'смекта', 'mezim', 'мезим', 'линекс', 'loperamide'],
+      'От аллергии': [
+        'allergy',
+        'аллерг',
+        'suprastin',
+        'супрастин',
+        'loratadine',
+        'лоратадин',
+        'cetirizine',
+        'цетиризин',
+      ],
+      'ЖКТ': [
+        'smecta',
+        'смекта',
+        'mezim',
+        'мезим',
+        'линекс',
+        'loperamide',
+        'регидрон',
+        'панкреатин',
+      ],
+      'От простуды': [
+        'cold',
+        'flu',
+        'cough',
+        'простуд',
+        'грипп',
+        'кашель',
+        'theraflu',
+        'терафлю',
+      ],
       'Противовирусное': [
         'antiviral',
         'арбидол',
@@ -120,6 +149,52 @@ class B2BOcrService {
     for (final entry in rules.entries) {
       if (entry.value.any(lower.contains)) return entry.key;
     }
+    return null;
+  }
+
+  String? _extractDosage(String text) {
+    final strengthPatterns = [
+      RegExp(
+        r'\b\d+(?:[,.]\d+)?\s*(?:mg|мг|g|г|mcg|мкг|µg|ml|мл|iu|ме|ед\.?|%)\b',
+        caseSensitive: false,
+      ),
+      RegExp(
+        r'\b\d+(?:[,.]\d+)?\s*(?:mg|мг)\s*/\s*\d+(?:[,.]\d+)?\s*(?:ml|мл)\b',
+        caseSensitive: false,
+      ),
+      RegExp(
+        r'\b\d+(?:[,.]\d+)?\s*(?:мг|mg)\s*\+\s*\d+(?:[,.]\d+)?\s*(?:мг|mg)\b',
+        caseSensitive: false,
+      ),
+    ];
+
+    for (final pattern in strengthPatterns) {
+      final match = pattern.firstMatch(text);
+      if (match == null) continue;
+      return _cleanValue(match.group(0) ?? '').replaceAll(',', '.');
+    }
+
+    return null;
+  }
+
+  String? _extractPackageSize(String text) {
+    final patterns = [
+      RegExp(
+        r'\b(?:№|n|no\.?|x)?\s?\d{1,4}\s*(?:табл\.?|таблет(?:ок|ки)?|капс\.?|капсул(?:а|ы)?|caps?|tablets?|амп\.?|ампул(?:а|ы)?|флак\.?|саше|пакет(?:ик)?|шт\.?|pcs?)\b',
+        caseSensitive: false,
+      ),
+      RegExp(
+        r'\b\d{1,4}\s*(?:x|х)\s*\d+(?:[,.]\d+)?\s*(?:mg|мг|ml|мл|g|г)\b',
+        caseSensitive: false,
+      ),
+    ];
+
+    for (final pattern in patterns) {
+      final match = pattern.firstMatch(text);
+      if (match == null) continue;
+      return _cleanValue(match.group(0) ?? '').replaceAll(',', '.');
+    }
+
     return null;
   }
 
@@ -148,10 +223,10 @@ class B2BOcrService {
   String? _extractBatch(String text) {
     final patterns = [
       RegExp(
-        r'(?:lot|batch|серия|партия|сер\.?)[:\s#№]*([A-ZА-Я0-9\-]{3,20})',
+        r'(?:lot|batch|серия|партия|сер\.?|серия №|партия №)[:\s#№]*([A-ZА-Я0-9\-]{3,24})',
         caseSensitive: false,
       ),
-      RegExp(r'\b[A-Z]{1,4}\d{3,10}[A-Z0-9\-]*\b'),
+      RegExp(r'\b[A-ZА-Я]{1,4}\d{3,12}[A-ZА-Я0-9\-]*\b'),
     ];
 
     for (final pattern in patterns) {
@@ -164,7 +239,7 @@ class B2BOcrService {
 
   DateTime? _extractExpiryDate(String text) {
     final datePattern = RegExp(
-      r'(?:exp\.?|expiry|expires|годен до|срок до|до)?\s*(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})',
+      r'(?:exp\.?|expiry|expires|годен до|срок годности|срок до|исп\.? до|до)?\s*(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})',
       caseSensitive: false,
     );
 
@@ -178,7 +253,7 @@ class B2BOcrService {
     }
 
     final monthPattern = RegExp(
-      r'(?:exp\.?|expiry|expires|годен до|срок до|до)\s*(\d{1,2})[./-](\d{2,4})',
+      r'(?:exp\.?|expiry|expires|годен до|срок годности|срок до|исп\.? до|до)\s*(\d{1,2})[./-](\d{2,4})',
       caseSensitive: false,
     );
 
@@ -194,6 +269,20 @@ class B2BOcrService {
         month,
         _lastDayOfMonth(normalizedYear, month),
       );
+      if (_isReasonableExpiry(date)) return date;
+    }
+
+    final yearFirstPattern = RegExp(
+      r'(?:exp\.?|expiry|expires|годен до|срок годности|срок до|до)?\s*(20\d{2})[./-](\d{1,2})(?:[./-](\d{1,2}))?',
+      caseSensitive: false,
+    );
+
+    for (final match in yearFirstPattern.allMatches(text)) {
+      final year = int.tryParse(match.group(1) ?? '');
+      final month = int.tryParse(match.group(2) ?? '');
+      final day = int.tryParse(match.group(3) ?? '');
+      if (year == null || month == null || month < 1 || month > 12) continue;
+      final date = DateTime(year, month, day ?? _lastDayOfMonth(year, month));
       if (_isReasonableExpiry(date)) return date;
     }
 
