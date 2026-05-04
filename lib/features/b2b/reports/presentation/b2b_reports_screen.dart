@@ -799,7 +799,7 @@ class B2BReportsScreen extends StatelessWidget {
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w900,
-            color: Colors.white,
+            color: Colors.black,
           ),
         ),
         const SizedBox(height: 16),
@@ -838,7 +838,7 @@ class B2BReportsScreen extends StatelessWidget {
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
-                    color: Colors.white,
+                    color: Colors.black,
                   ),
                 ),
                 Text(
