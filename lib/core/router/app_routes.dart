@@ -45,5 +45,6 @@ class AppRoutes {
   static const b2bSettings = '/b2b-settings';
   static const b2bTeam = '/b2b-team';
   static const b2bSalesHistory = '/b2b-sales-history';
+  static const b2bActivityHistory = '/b2b-activity-history';
   static const b2bLocations = '/b2b-locations';
 }

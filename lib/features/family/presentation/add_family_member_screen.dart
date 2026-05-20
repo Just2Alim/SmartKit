@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import '../data/family_repository.dart';
 import '../models/family_member_model.dart';
@@ -40,7 +40,7 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
   }
 
   Future<void> saveMember() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
 
     if (user == null) {
       ScaffoldMessenger.of(
@@ -69,7 +69,7 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
     try {
       final member = FamilyMemberModel(
         id: '',
-        userId: user.uid,
+        userId: user.id,
         name: nameCtrl.text.trim(),
         relation: selectedRelation,
         age: age,
@@ -116,7 +116,6 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-
       appBar: AppBar(title: const Text('Добавить члена семьи')),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -137,7 +136,9 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(

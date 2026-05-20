@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class ReminderModel {
   final String id;
   final String userId;
@@ -27,34 +25,35 @@ class ReminderModel {
 
   Map<String, dynamic> toMap() {
     return {
-      'userId': userId,
-      'medicineId': medicineId,
-      'familyMemberId': familyMemberId,
+      'user_id': userId,
+      'medicine_id': medicineId,
+      'family_member_id': familyMemberId,
       'title': title,
       'time': time,
-      'isDaily': isDaily,
+      'is_daily': isDaily,
       'enabled': enabled,
-      'weekDays': weekDays,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'week_days': weekDays,
+      'created_at': createdAt.toIso8601String(),
     };
   }
 
-  factory ReminderModel.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data()!;
+  factory ReminderModel.fromMap(Map<String, dynamic> data) {
+    DateTime parseDate(dynamic value) {
+      if (value is DateTime) return value;
+      return DateTime.tryParse(value?.toString() ?? '') ?? DateTime.now();
+    }
+
     return ReminderModel(
-      id: doc.id,
-      userId: data['userId'] ?? '',
-      medicineId: data['medicineId'] ?? '',
-      familyMemberId: data['familyMemberId'],
+      id: data['id'] ?? '',
+      userId: data['user_id'] ?? data['userId'] ?? '',
+      medicineId: data['medicine_id'] ?? data['medicineId'] ?? '',
+      familyMemberId: data['family_member_id'] ?? data['familyMemberId'],
       title: data['title'] ?? '',
       time: data['time'] ?? '',
-      isDaily: data['isDaily'] ?? true,
+      isDaily: data['is_daily'] ?? data['isDaily'] ?? true,
       enabled: data['enabled'] ?? true,
-      weekDays: List<int>.from(data['weekDays'] ?? []),
-      createdAt:
-          data['createdAt'] != null
-              ? (data['createdAt'] as Timestamp).toDate()
-              : DateTime.now(),
+      weekDays: List<int>.from(data['week_days'] ?? data['weekDays'] ?? []),
+      createdAt: parseDate(data['created_at'] ?? data['createdAt']),
     );
   }
 

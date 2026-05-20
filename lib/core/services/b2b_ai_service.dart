@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/b2b/inventory/models/b2b_inventory_model.dart';
 import '../../features/b2b/inventory/models/b2b_sale_model.dart';
 import '../../features/b2b/inventory/models/b2b_location_model.dart';
+import '../api/smartkit_api_client.dart';
 import 'ai_safety.dart';
 
 /// Специализированный сервис ИИ для B2B сектора SmartKit.
@@ -24,7 +26,10 @@ class B2BAiService {
     'http://127.0.0.1:11434/api/chat',
     'http://10.0.2.2:11434/api/chat',
   ];
-  static const String _model = 'llama3';
+  static const String _model = String.fromEnvironment(
+    'OLLAMA_MODEL',
+    defaultValue: 'qwen3:latest',
+  );
 
   /// Инициализация ИИ данными о складе, продажах и локациях
   void init(
@@ -120,6 +125,16 @@ class B2BAiService {
       final promptText = AiSafety.wrapUserMessageWithLanguageInstruction(text);
       _history.add({'role': 'user', 'content': promptText});
 
+      final backendResponse = await _sendViaBackend(text);
+      if (backendResponse != null && backendResponse.trim().isNotEmpty) {
+        var responseText = backendResponse.trim();
+        if (AiSafety.appearsToUseDifferentLanguage(responseText, text)) {
+          responseText = _languageSafeBusinessFallback(text);
+        }
+        _history.add({'role': 'assistant', 'content': responseText});
+        return responseText;
+      }
+
       for (final endpoint in _candidateBaseUrls) {
         try {
           final response = await http.post(
@@ -129,7 +144,12 @@ class B2BAiService {
               'model': _model,
               'messages': _history,
               'stream': false,
-              'options': {'temperature': 0.25, 'top_p': 0.85},
+              'options': {
+                'temperature': 0.25,
+                'top_p': 0.85,
+                'num_ctx': 8192,
+                'num_predict': 4096,
+              },
             }),
           );
 
@@ -194,7 +214,12 @@ class B2BAiService {
             },
           ],
           'stream': false,
-          'options': {'temperature': 0.1, 'top_p': 0.8},
+          'options': {
+            'temperature': 0.1,
+            'top_p': 0.8,
+            'num_ctx': 8192,
+            'num_predict': 2048,
+          },
         }),
       );
 
@@ -204,6 +229,38 @@ class B2BAiService {
     } catch (_) {
       return null;
     }
+  }
+
+  Future<String?> _sendViaBackend(String text) async {
+    final organizationId = _currentOrganizationId;
+    final accessToken =
+        Supabase.instance.client.auth.currentSession?.accessToken;
+    if (organizationId == null || accessToken == null) return null;
+
+    try {
+      final response = await SmartKitApiClient().postJson(
+        'business-analysis',
+        accessToken: accessToken,
+        body: {'organizationId': organizationId, 'prompt': text},
+      );
+      return response['message']?.toString();
+    } catch (error) {
+      debugPrint('SmartKit business AI gateway unavailable: $error');
+      return null;
+    }
+  }
+
+  String? get _currentOrganizationId {
+    for (final item in _inventory) {
+      if (item.userId.trim().isNotEmpty) return item.userId;
+    }
+    for (final sale in _sales) {
+      if (sale.userId.trim().isNotEmpty) return sale.userId;
+    }
+    for (final location in _locations) {
+      if (location.userId.trim().isNotEmpty) return location.userId;
+    }
+    return null;
   }
 
   String _offlineBusinessResponse(String text) {

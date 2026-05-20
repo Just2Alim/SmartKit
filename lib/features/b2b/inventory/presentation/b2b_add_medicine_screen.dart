@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/router/app_routes.dart';
@@ -92,11 +92,11 @@ class _B2BAddMedicineScreenState extends State<B2BAddMedicineScreen> {
   }
 
   Future<void> _fetchLocations() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
 
     final locs = await _locationsRepository
-        .getLocationsByUser(user.uid)
+        .getLocationsByUser(user.id)
         .first
         .timeout(const Duration(seconds: 4), onTimeout: () => []);
     if (!mounted) return;
@@ -201,8 +201,8 @@ class _B2BAddMedicineScreenState extends State<B2BAddMedicineScreen> {
   }
 
   Future<void> saveItem() async {
-    final user = FirebaseAuth.instance.currentUser;
-    final ownerId = editingItem?.userId ?? user?.uid;
+    final user = Supabase.instance.client.auth.currentUser;
+    final ownerId = editingItem?.userId ?? user?.id;
 
     if (ownerId == null) {
       _showSnack('Пользователь не найден');

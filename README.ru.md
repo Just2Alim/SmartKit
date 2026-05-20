@@ -3,8 +3,8 @@
 ![SmartKit Banner](assets/readme/banner.png)
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.22.0+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
-[![Firebase](https://img.shields.io/badge/Firebase-Auth%20%7C%20Firestore-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com)
-[![Gemini AI](https://img.shields.io/badge/AI-Powered%20by%20Gemini-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://deepmind.google/technologies/gemini/)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL%20%7C%20Auth-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
+[![Ollama AI](https://img.shields.io/badge/AI-Server%20Ollama%2FLLM-FC6404?style=for-the-badge&logo=ollama&logoColor=white)](https://ollama.com)
 
 **SmartKit** — это современное мобильное приложение на базе искусственного интеллекта, созданное для упрощения контроля за приемом лекарств. От мгновенного сканирования штрих-кодов до умных рекомендаций ИИ — SmartKit заботится о вашем здоровье.
 
@@ -20,7 +20,7 @@
   3. **Локальная база**: Оптимизирована для популярных препаратов в РФ (30+ записей).
 - **Поддержка при ошибках**: Функция копирования кода для сообщения о недостающих данных и ручной ввод.
 
-### 🤖 Умный ИИ-ассистент (Gemini)
+### 🤖 Умный ИИ-ассистент
 - **Медицинский чат**: Узнайте о побочных эффектах, дозировках или совместимости препаратов.
 - **Конструктор аптечки**: Опишите ситуацию (например, «Собираюсь в горы на 3 дня»), и ИИ предложит оптимальный состав аптечки.
 - **Персональные советы**: Рекомендации на основе содержимого вашей аптечки.
@@ -39,9 +39,13 @@
 ## 🛠 Технологии
 
 - **Frontend**: [Flutter](https://flutter.dev)
-- **Backend**: [Firebase](https://firebase.google.com) (Auth, Firestore)
-- **AI**: [Google Gemini Pro API](https://ai.google.dev/)
+- **Backend**: [Supabase](https://supabase.com) (PostgreSQL, Auth, RLS, Edge Functions)
+- **AI**: Server-side Ollama/Qwen3 gateway
 - **Scanner**: [mobile_scanner](https://pub.dev/packages/mobile_scanner)
+
+> Проект находится в переходе на PostgreSQL/Supabase backend. Новое ТЗ и
+> командные инструкции лежат в `docs/obsidian`, а первичная схема PostgreSQL и
+> Edge Functions - в `supabase`.
 
 ---
 
@@ -49,8 +53,8 @@
 
 ### Требования
 - Flutter SDK (последняя стабильная версия)
-- Firebase проект
-- Ключ Gemini API из [Google AI Studio](https://aistudio.google.com/)
+- Supabase проект
+- Hosted Ollama/Qwen3 или другой LLM endpoint для Edge Functions
 
 ### Установка
 
@@ -65,19 +69,51 @@
    flutter pub get
    ```
 
-3. **Настройте ключи API**:
-   Создайте файл `lib/core/constants/api_keys.dart` на основе примера:
-   ```dart
-   class ApiKeys {
-     static const String geminiApiKey = 'ВАШ_GEMINI_API_KEY';
-     static const String firebaseWebApiKey = 'ВАШ_FIREBASE_WEB_API_KEY';
-   }
-   ```
+3. **Настройте backend переменные**:
+   Используйте `.env.example` как шаблон, создайте локальный `.env` и
+   передавайте значения через `--dart-define-from-file=.env`.
 
 4. **Запустите приложение**:
    ```bash
-   flutter run
+   flutter run -d chrome --dart-define-from-file=.env
    ```
+
+### PostgreSQL/Supabase backend
+
+Для разработки backend-слоя используйте значения из `.env.example` и
+передавайте их во Flutter через `--dart-define-from-file=.env`:
+
+```bash
+flutter run -d chrome --dart-define-from-file=.env
+```
+
+SQL-миграции находятся в `supabase/migrations`, серверные функции для AI - в
+`supabase/functions`. Для реальных облачных AI-ответов нужен публичный
+`OLLAMA_BASE_URL` или другой LLM gateway; Edge Functions не могут обращаться к
+локальному `localhost` разработчика.
+
+### Docker deployment
+
+Web-релиз и Qwen3 можно поднять через Docker Compose:
+
+```bash
+docker compose --env-file .env up --build
+```
+
+Приложение будет доступно на `http://localhost:8080`, Ollama автоматически
+подтянет `qwen3:latest`. Это намеренно полноценный Qwen3 tag: ответы будут
+качественнее, но на ноутбуке могут генерироваться дольше.
+
+Если Supabase Edge Functions должны обращаться к приватному Ollama-хосту,
+поднимите `scripts/ollama_proxy.mjs` за доменом или tunnel и сохраните
+секреты в Supabase:
+
+```bash
+supabase secrets set \
+  OLLAMA_BASE_URL=https://your-ollama-proxy.example.com \
+  OLLAMA_MODEL=qwen3:latest \
+  OLLAMA_API_KEY=$OLLAMA_PROXY_TOKEN
+```
 
 ---
 
@@ -86,7 +122,7 @@
 ```text
 lib/
 ├── core/               # Конфигурация, темы, константы и сервисы
-│   ├── services/       # ИИ (Gemini), Auth, Сканер и др.
+│   ├── services/       # ИИ, Auth, Сканер и др.
 │   └── theme/          # Система дизайна SmartKit
 ├── features/           # Архитектура по фичам
 │   ├── ai/             # Чат и конструктор аптечки

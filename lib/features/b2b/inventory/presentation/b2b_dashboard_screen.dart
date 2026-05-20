@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -28,47 +28,61 @@ class B2BDashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
     if (user == null)
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: StreamBuilder<List<B2BInventoryModel>>(
-        stream: _inventoryRepository.getItemsByUser(user.uid),
+        stream: _inventoryRepository.getItemsByUser(user.id),
         builder: (context, inventorySnapshot) {
           if (inventorySnapshot.hasError) {
-            return Scaffold(body: Center(child: Text('Ошибка склада: ${inventorySnapshot.error}')));
+            return Scaffold(
+              body: Center(
+                child: Text('Ошибка склада: ${inventorySnapshot.error}'),
+              ),
+            );
           }
           if (inventorySnapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(body: Center(child: CircularProgressIndicator()));
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
           }
-          
+
           final inventory = inventorySnapshot.data ?? [];
           final lowStock = _lowStockCount(inventory);
           final totalMeds = inventory.length;
 
           return StreamBuilder<List<B2BSaleModel>>(
-            stream: _salesRepository.getSalesByUser(user.uid),
+            stream: _salesRepository.getSalesByUser(user.id),
             builder: (context, salesSnapshot) {
               if (salesSnapshot.connectionState == ConnectionState.waiting) {
-                return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
               }
               final sales = salesSnapshot.data ?? [];
 
               return StreamBuilder<List<B2BActivityModel>>(
-                stream: _activityRepository.getActivitiesByUser(user.uid),
+                stream: _activityRepository.getActivitiesByUser(user.id),
                 builder: (context, activitySnapshot) {
-                  if (activitySnapshot.connectionState == ConnectionState.waiting) {
-                    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                  if (activitySnapshot.connectionState ==
+                      ConnectionState.waiting) {
+                    return const Scaffold(
+                      body: Center(child: CircularProgressIndicator()),
+                    );
                   }
                   final activities = activitySnapshot.data ?? [];
 
                   return StreamBuilder<List<B2BLocationModel>>(
-                    stream: _locationsRepository.getLocationsByUser(user.uid),
+                    stream: _locationsRepository.getLocationsByUser(user.id),
                     builder: (context, locationSnapshot) {
-                      if (locationSnapshot.connectionState == ConnectionState.waiting) {
-                        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                      if (locationSnapshot.connectionState ==
+                          ConnectionState.waiting) {
+                        return const Scaffold(
+                          body: Center(child: CircularProgressIndicator()),
+                        );
                       }
                       final locations = locationSnapshot.data ?? [];
 
@@ -132,10 +146,10 @@ class B2BDashboardScreen extends StatelessWidget {
                                     () {
                                       Navigator.pushNamed(
                                         context,
-                                        AppRoutes.b2bSalesHistory,
+                                        AppRoutes.b2bActivityHistory,
                                       );
                                     },
-                                    actionLabel: 'История',
+                                    actionLabel: 'Все',
                                   ),
                                   const SizedBox(height: 16),
                                   _buildActivityList(
@@ -219,7 +233,9 @@ class B2BDashboardScreen extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              user.displayName ?? 'ООО «МедЦентр»',
+                              user.userMetadata?['companyName']?.toString() ??
+                                  user.userMetadata?['name']?.toString() ??
+                                  'ООО «МедЦентр»',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 18,
@@ -531,11 +547,11 @@ class B2BDashboardScreen extends StatelessWidget {
   }
 
   Widget _buildLocationsList(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return const SizedBox.shrink();
 
     return StreamBuilder<List<B2BLocationModel>>(
-      stream: B2BLocationsRepository().getLocationsByUser(user.uid),
+      stream: B2BLocationsRepository().getLocationsByUser(user.id),
       builder: (context, snapshot) {
         final locations = snapshot.data ?? [];
         if (locations.isEmpty) {
@@ -845,9 +861,10 @@ class B2BDashboardScreen extends StatelessWidget {
     final Map<String, int> categories = {};
     for (var item in inventory) {
       final raw = item.category.trim();
-      final category = raw.isEmpty
-          ? 'Прочее'
-          : raw[0].toUpperCase() + raw.substring(1).toLowerCase();
+      final category =
+          raw.isEmpty
+              ? 'Прочее'
+              : raw[0].toUpperCase() + raw.substring(1).toLowerCase();
       // Using product count instead of stock for better distribution visibility
       categories[category] = (categories[category] ?? 0) + 1;
     }
@@ -1206,28 +1223,23 @@ class B2BDashboardScreen extends StatelessWidget {
       ],
     );
   }
+
   Widget _buildRecentInventory(
     BuildContext context,
     List<B2BInventoryModel> items,
   ) {
     if (items.isEmpty) return const SizedBox.shrink();
 
-    final recentItems =
-        List<B2BInventoryModel>.from(items)
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final recentItems = List<B2BInventoryModel>.from(items)
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     final displayItems = recentItems.take(3).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(
-          context,
-          'Новые поступления',
-          () {
-            Navigator.pushNamed(context, AppRoutes.b2bInventory);
-          },
-          actionLabel: 'Весь склад',
-        ),
+        _buildSectionHeader(context, 'Новые поступления', () {
+          Navigator.pushNamed(context, AppRoutes.b2bInventory);
+        }, actionLabel: 'Весь склад'),
         const SizedBox(height: 16),
         ...displayItems.map((item) => _inventoryMiniCard(context, item)),
       ],
@@ -1252,7 +1264,10 @@ class B2BDashboardScreen extends StatelessWidget {
               color: const Color(0xFF10B981).withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.medication_outlined, color: Color(0xFF10B981)),
+            child: const Icon(
+              Icons.medication_outlined,
+              color: Color(0xFF10B981),
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -1277,10 +1292,7 @@ class B2BDashboardScreen extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: Colors.white24,
-          ),
+          const Icon(Icons.chevron_right_rounded, color: Colors.white24),
         ],
       ),
     );

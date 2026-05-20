@@ -1,9 +1,8 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import '../../../core/router/app_routes.dart';
 import '../data/family_repository.dart';
 import '../models/family_member_model.dart';
-
 
 class FamilyScreen extends StatelessWidget {
   FamilyScreen({super.key});
@@ -12,10 +11,9 @@ class FamilyScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
 
     return Scaffold(
-
       appBar: AppBar(title: const Text('Моя семья')),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
@@ -28,7 +26,7 @@ class FamilyScreen extends StatelessWidget {
             user == null
                 ? const Center(child: Text('Пользователь не найден'))
                 : StreamBuilder<List<FamilyMemberModel>>(
-                  stream: _repository.getFamilyMembersByUser(user.uid),
+                  stream: _repository.getFamilyMembersByUser(user.id),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
@@ -126,7 +124,10 @@ class FamilyScreen extends StatelessWidget {
                               'Пока нет добавленных членов семьи',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                color:
+                                    Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
                               ),
                             ),
                           )
@@ -183,7 +184,10 @@ class FamilyScreen extends StatelessWidget {
                                               style: TextStyle(
                                                 fontSize: 16,
                                                 fontWeight: FontWeight.w800,
-                                                color: Theme.of(context).colorScheme.onSurface,
+                                                color:
+                                                    Theme.of(
+                                                      context,
+                                                    ).colorScheme.onSurface,
                                               ),
                                             ),
                                             const SizedBox(height: 4),
@@ -191,7 +195,10 @@ class FamilyScreen extends StatelessWidget {
                                               '${member.relation} • ${member.age} лет',
                                               style: TextStyle(
                                                 fontSize: 13,
-                                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                color:
+                                                    Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurfaceVariant,
                                               ),
                                             ),
                                             const SizedBox(height: 6),

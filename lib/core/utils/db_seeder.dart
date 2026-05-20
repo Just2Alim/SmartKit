@@ -1,12 +1,13 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../features/b2b/inventory/data/b2b_inventory_repository.dart';
+import '../../features/b2b/inventory/data/b2b_locations_repository.dart';
+import '../../features/b2b/inventory/data/b2b_sales_repository.dart';
 import '../../features/b2b/inventory/models/b2b_inventory_model.dart';
 import '../../features/b2b/inventory/models/b2b_sale_model.dart';
 import '../../features/b2b/inventory/models/b2b_location_model.dart';
 
 class DbSeeder {
   static Future<void> seedB2BInventory(String userId) async {
-    final firestore = FirebaseFirestore.instance;
-    final collection = firestore.collection('b2b_inventory');
+    final repository = B2BInventoryRepository();
 
     final sampleItems = [
       B2BInventoryModel(
@@ -61,7 +62,9 @@ class DbSeeder {
         minStock: 20,
         price: 980,
         userId: userId,
-        expiryDate: DateTime.now().add(const Duration(days: 10)), // Скоро истекает
+        expiryDate: DateTime.now().add(
+          const Duration(days: 10),
+        ), // Скоро истекает
         createdAt: DateTime.now(),
       ),
       B2BInventoryModel(
@@ -122,13 +125,12 @@ class DbSeeder {
     ];
 
     for (var item in sampleItems) {
-      await collection.doc(item.id).set(item.toMap());
+      await repository.addItem(item);
     }
   }
 
   static Future<void> seedB2BSales(String userId) async {
-    final firestore = FirebaseFirestore.instance;
-    final collection = firestore.collection('b2b_sales');
+    final repository = B2BSalesRepository();
 
     final now = DateTime.now();
     final sampleSales = [
@@ -182,13 +184,12 @@ class DbSeeder {
     ];
 
     for (var sale in sampleSales) {
-      await collection.doc(sale.id).set(sale.toMap());
+      await repository.recordSale(sale);
     }
   }
 
   static Future<void> seedB2BLocations(String userId) async {
-    final firestore = FirebaseFirestore.instance;
-    final collection = firestore.collection('b2b_locations');
+    final repository = B2BLocationsRepository();
 
     final sampleLocations = [
       B2BLocationModel(
@@ -224,7 +225,7 @@ class DbSeeder {
     ];
 
     for (var loc in sampleLocations) {
-      await collection.doc(loc.id).set(loc.toMap());
+      await repository.addLocation(loc);
     }
   }
 }

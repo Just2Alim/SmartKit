@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../../medicine/data/medicine_repository.dart';
@@ -21,10 +21,9 @@ class FamilyMemberMedicinesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
 
     return Scaffold(
-
       appBar: AppBar(title: const Text('Лекарства')),
       body:
           user == null
@@ -119,7 +118,7 @@ class FamilyMemberMedicinesScreen extends StatelessWidget {
                         child: StreamBuilder<List<MedicineModel>>(
                           stream: _medicineRepository
                               .getMedicinesByFamilyMember(
-                                userId: user.uid,
+                                userId: user.id,
                                 familyMemberId: memberId,
                               ),
                           builder: (context, snapshot) {
@@ -154,7 +153,10 @@ class FamilyMemberMedicinesScreen extends StatelessWidget {
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         fontSize: 14,
-                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        color:
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                   ),
@@ -198,16 +200,23 @@ class FamilyMemberMedicinesScreen extends StatelessWidget {
                                           width: 54,
                                           height: 54,
                                           decoration: BoxDecoration(
-                                            color: Theme.of(context).brightness == Brightness.dark
-                                                ? const Color(0xFF1E3A8A).withOpacity(0.3)
-                                                : const Color(0xFFDBEAFE),
+                                            color:
+                                                Theme.of(context).brightness ==
+                                                        Brightness.dark
+                                                    ? const Color(
+                                                      0xFF1E3A8A,
+                                                    ).withOpacity(0.3)
+                                                    : const Color(0xFFDBEAFE),
                                             borderRadius: BorderRadius.circular(
                                               16,
                                             ),
                                           ),
                                           child: Icon(
                                             Icons.medication_rounded,
-                                            color: Theme.of(context).colorScheme.primary,
+                                            color:
+                                                Theme.of(
+                                                  context,
+                                                ).colorScheme.primary,
                                           ),
                                         ),
                                         const SizedBox(width: 14),
@@ -221,7 +230,10 @@ class FamilyMemberMedicinesScreen extends StatelessWidget {
                                                 style: TextStyle(
                                                   fontSize: 16,
                                                   fontWeight: FontWeight.w800,
-                                                  color: Theme.of(context).colorScheme.onSurface,
+                                                  color:
+                                                      Theme.of(
+                                                        context,
+                                                      ).colorScheme.onSurface,
                                                 ),
                                               ),
                                               const SizedBox(height: 4),
@@ -229,7 +241,10 @@ class FamilyMemberMedicinesScreen extends StatelessWidget {
                                                 '${medicine.dosage} • ${medicine.category}',
                                                 style: TextStyle(
                                                   fontSize: 13,
-                                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                  color:
+                                                      Theme.of(context)
+                                                          .colorScheme
+                                                          .onSurfaceVariant,
                                                 ),
                                               ),
                                               const SizedBox(height: 6),
@@ -238,7 +253,10 @@ class FamilyMemberMedicinesScreen extends StatelessWidget {
                                                 style: TextStyle(
                                                   fontSize: 12,
                                                   fontWeight: FontWeight.w700,
-                                                  color: Theme.of(context).colorScheme.primary,
+                                                  color:
+                                                      Theme.of(
+                                                        context,
+                                                      ).colorScheme.primary,
                                                 ),
                                               ),
                                             ],
@@ -250,7 +268,10 @@ class FamilyMemberMedicinesScreen extends StatelessWidget {
                                             vertical: 6,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                            color:
+                                                Theme.of(context)
+                                                    .colorScheme
+                                                    .surfaceContainerHighest,
                                             borderRadius: BorderRadius.circular(
                                               999,
                                             ),
@@ -260,7 +281,10 @@ class FamilyMemberMedicinesScreen extends StatelessWidget {
                                             style: TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.w700,
-                                              color: Theme.of(context).colorScheme.onSurface,
+                                              color:
+                                                  Theme.of(
+                                                    context,
+                                                  ).colorScheme.onSurface,
                                             ),
                                           ),
                                         ),

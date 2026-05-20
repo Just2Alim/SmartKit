@@ -34,6 +34,7 @@ import '../../features/b2b/auth/presentation/b2b_login_screen.dart';
 import '../../features/b2b/auth/presentation/b2b_onboarding_screen.dart';
 import '../../features/b2b/auth/presentation/b2b_signup_screen.dart';
 import '../../features/b2b/inventory/presentation/b2b_add_medicine_screen.dart';
+import '../../features/b2b/inventory/presentation/b2b_activity_history_screen.dart';
 import '../../features/b2b/inventory/presentation/b2b_inventory_screen.dart';
 import '../../features/b2b/inventory/presentation/b2b_medicine_detail_screen.dart';
 import '../../features/b2b/inventory/presentation/b2b_notifications_screen.dart';
@@ -210,6 +211,9 @@ class AppRouter {
 
       case AppRoutes.b2bSalesHistory:
         return _page(const B2BSalesHistoryScreen());
+
+      case AppRoutes.b2bActivityHistory:
+        return _page(const B2BActivityHistoryScreen());
 
       case AppRoutes.b2bLocations:
         return _page(const B2BLocationsScreen());

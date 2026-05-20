@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 enum B2BActivityType {
   sale,
   stockUpdate,
@@ -31,20 +29,19 @@ class B2BActivityModel {
 
   Map<String, dynamic> toMap() {
     return {
-      'userId': userId,
+      'organization_id': userId,
       'type': type.name,
       'title': title,
       'description': description,
-      'timestamp': timestamp.toIso8601String(),
+      'created_at': timestamp.toIso8601String(),
       'metadata': metadata,
     };
   }
 
-  factory B2BActivityModel.fromDoc(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory B2BActivityModel.fromMap(Map<String, dynamic> data) {
     return B2BActivityModel(
-      id: doc.id,
-      userId: data['userId'] ?? '',
+      id: data['id'] ?? '',
+      userId: data['organization_id'] ?? data['userId'] ?? '',
       type: B2BActivityType.values.firstWhere(
         (e) => e.name == data['type'],
         orElse: () => B2BActivityType.sale,
@@ -52,10 +49,15 @@ class B2BActivityModel {
       title: data['title'] ?? '',
       description: data['description'] ?? '',
       timestamp:
-          data['timestamp'] != null
+          data['created_at'] != null
+              ? DateTime.parse(data['created_at'])
+              : data['timestamp'] != null
               ? DateTime.parse(data['timestamp'])
               : DateTime.now(),
-      metadata: data['metadata'],
+      metadata:
+          data['metadata'] == null
+              ? null
+              : Map<String, dynamic>.from(data['metadata']),
     );
   }
 }

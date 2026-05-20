@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/router/app_routes.dart';
@@ -88,14 +88,14 @@ class B2BInventoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body:
           user == null
               ? const Center(child: Text('Пользователь не найден'))
               : StreamBuilder<List<B2BInventoryModel>>(
-                stream: _repository.getItemsByUser(user.uid),
+                stream: _repository.getItemsByUser(user.id),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(

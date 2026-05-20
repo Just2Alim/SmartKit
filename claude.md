@@ -23,8 +23,8 @@
 - [x] **Unified Theme & Dark Mode Pass**: Added shared theme tokens, reusable UI primitives, and dark-mode-safe surfaces across core B2B and shop flows.
 - [x] **AI Reliability & Safety Pass**: Added centralized medical/business guardrails, Ollama endpoint fallbacks, deterministic offline answers, and B2B analytics fallback so AI cards no longer surface raw Ollama connection errors.
 - [x] **AI Language Consistency**: Added latest-message language detection, strict per-request language instructions, mixed-language repair retries, and localized AI fallbacks for B2C, B2B, Gemini reserve, and AI kit cart summaries.
-- [x] **AI Kit Builder & Cart Handoff**: Rebuilt B2C kit assembly around user needs, current home medicines, live Firestore catalog matching, missing-item warnings, confirmation buttons, cart creation, and cart navigation.
-- [x] **Universal Barcode & Package Scan**: Reworked B2C medicine scanning so unknown barcodes become editable drafts, public/learned/B2B lookup sources are checked, package OCR fills dosage/expiry/batch/package fields, and saved scans teach the Firestore barcode cache.
+- [x] **AI Kit Builder & Cart Handoff**: Rebuilt B2C kit assembly around user needs, current home medicines, live PostgreSQL catalog matching, missing-item warnings, confirmation buttons, cart creation, and cart navigation.
+- [x] **Universal Barcode & Package Scan**: Reworked B2C medicine scanning so unknown barcodes become editable drafts, public/learned/B2B lookup sources are checked, package OCR fills dosage/expiry/batch/package fields, and saved scans teach the PostgreSQL barcode cache.
 - [ ] **Activity Detail/Navigation**: Add a dedicated screen to view the full history of activities, including filtering by type.
 
 ## Completed Work
@@ -48,7 +48,7 @@
   - Updated the B2C shop catalog, product detail, and cart quantity text to respect dark-mode surfaces and text colors.
 - **B2B Flow Stabilization**:
   - Made activity logging non-blocking so product creation, stock updates, and sales do not fail if activity writes are unavailable.
-  - Removed Firestore `orderBy` dependency from sales/activity streams and moved sorting client-side to avoid missing-index failures.
+  - Removed backend ordering dependency from sales/activity streams and kept client-side sorting for stable realtime updates.
   - Added timeout-safe location loading in `B2BAddMedicineScreen`; products can be added even when no locations exist.
   - Changed `B2BReportsScreen` to render zero-state analytics from empty lists instead of waiting forever for empty streams.
   - Updated the public shop catalog to show every created product, including zero-stock items, with live stock badges and disabled buying when stock is unavailable.
@@ -82,9 +82,9 @@
   - **Premium Dashboard**: Rebuilt `B2BDashboardScreen` with a sliver-based layout, gradient headers, and business-centric cards.
   - **Analytics & Reports**: Modernized `B2BReportsScreen` and `B2BSalesHistoryScreen` with rich data visualization, custom sliver scroll effects, and professional typography.
   - **Floating Navigation**: Updated `B2BMainScreen` with a modern, floating bottom bar for better ergonomics.
-  - **Data Integration**: Connected the dashboard and reports to live Firestore streams for real-time inventory and sales tracking.
+  - **Data Integration**: Connected the dashboard and reports to live Supabase realtime streams for real-time inventory and sales tracking.
 - **B2B & Shop Integration**:
-  - **Dynamic Shop**: Refactored `ShopScreen` to fetch real items from Firestore B2B Inventory.
+  - **Dynamic Shop**: Refactored `ShopScreen` to fetch real items from PostgreSQL B2B inventory.
   - **Checkout Logic**: Implemented full checkout cycle in `CartScreen` with stock reduction and sales recording.
   - **Data Seeding**: Expanded `DbSeeder` with 10+ diverse medical products for testing.
 - **AI & Safety Protocols**:

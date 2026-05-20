@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import '../../family/data/family_repository.dart';
 import '../../family/models/family_member_model.dart';
@@ -12,7 +12,6 @@ import '../../auth/models/app_user.dart';
 import '../../reminders/data/reminder_repository.dart';
 import '../../reminders/models/reminder_model.dart';
 
-
 class DashboardScreen extends StatelessWidget {
   DashboardScreen({super.key});
 
@@ -24,7 +23,6 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
@@ -71,13 +69,17 @@ class DashboardScreen extends StatelessWidget {
                 title: 'Мои лекарства',
                 actionText: 'Добавить',
                 onTap: () async {
-                  final result = await Navigator.pushNamed(context, AppRoutes.scanBarcode);
+                  final result = await Navigator.pushNamed(
+                    context,
+                    AppRoutes.scanBarcode,
+                  );
                   if (result != null && result is Map<String, dynamic>) {
                     if (!context.mounted) return;
                     Navigator.pushNamed(
                       context,
                       AppRoutes.addMedicine,
-                      arguments: result['manual'] == true ? {'name': ''} : result,
+                      arguments:
+                          result['manual'] == true ? {'name': ''} : result,
                     );
                   }
                 },
@@ -111,15 +113,19 @@ class DashboardScreen extends StatelessWidget {
             children: [
               Text(
                 'Добро пожаловать',
-                style: TextStyle(fontSize: 15, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 4),
               FutureBuilder<AppUser?>(
                 future: AuthRepository().getCurrentAppUser(),
                 builder: (context, snapshot) {
                   final name = snapshot.data?.name;
-                  final displayName = (name != null && name.isNotEmpty) ? name : 'SmartKit';
-                  
+                  final displayName =
+                      (name != null && name.isNotEmpty) ? name : 'SmartKit';
+
                   return Text(
                     displayName,
                     style: TextStyle(
@@ -183,11 +189,17 @@ class DashboardScreen extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(Icons.search_rounded, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.search_rounded,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(width: 12),
             Text(
               'Поиск лекарств, наборов, советов...',
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 14),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 14,
+              ),
             ),
           ],
         ),
@@ -196,17 +208,17 @@ class DashboardScreen extends StatelessWidget {
   }
 
   Widget _buildQuickStats() {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
 
     if (user == null) {
       return const SizedBox.shrink();
     }
 
     return StreamBuilder<List<MedicineModel>>(
-      stream: _medicineRepository.getMedicinesByUser(user.uid),
+      stream: _medicineRepository.getMedicinesByUser(user.id),
       builder: (context, medicineSnapshot) {
         return StreamBuilder<List<B2BInventoryModel>>(
-          stream: _b2bRepository.getItemsByUser(user.uid),
+          stream: _b2bRepository.getItemsByUser(user.id),
           builder: (context, b2bSnapshot) {
             if (medicineSnapshot.connectionState == ConnectionState.waiting ||
                 b2bSnapshot.connectionState == ConnectionState.waiting) {
@@ -235,7 +247,7 @@ class DashboardScreen extends StatelessWidget {
             final notificationsCount = expiringCount + lowStockCount;
 
             return StreamBuilder<List<FamilyMemberModel>>(
-              stream: _familyRepository.getFamilyMembersByUser(user.uid),
+              stream: _familyRepository.getFamilyMembersByUser(user.id),
               builder: (context, familySnapshot) {
                 if (familySnapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -253,9 +265,16 @@ class DashboardScreen extends StatelessWidget {
                             title: 'Лекарства',
                             value: totalItemsCount.toString(),
                             subtitle: 'всего позиций',
-                            colors: const [Color(0xFF60A5FA), Color(0xFF2563EB)],
+                            colors: const [
+                              Color(0xFF60A5FA),
+                              Color(0xFF2563EB),
+                            ],
                             icon: Icons.medication_rounded,
-                            onTap: () => Navigator.pushNamed(context, AppRoutes.search),
+                            onTap:
+                                () => Navigator.pushNamed(
+                                  context,
+                                  AppRoutes.search,
+                                ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -265,9 +284,16 @@ class DashboardScreen extends StatelessWidget {
                             title: 'Уведомления',
                             value: notificationsCount.toString(),
                             subtitle: 'важных',
-                            colors: const [Color(0xFFA78BFA), Color(0xFF7C3AED)],
+                            colors: const [
+                              Color(0xFFA78BFA),
+                              Color(0xFF7C3AED),
+                            ],
                             icon: Icons.notifications_active_rounded,
-                            onTap: () => Navigator.pushNamed(context, AppRoutes.notifications),
+                            onTap:
+                                () => Navigator.pushNamed(
+                                  context,
+                                  AppRoutes.notifications,
+                                ),
                           ),
                         ),
                       ],
@@ -281,9 +307,16 @@ class DashboardScreen extends StatelessWidget {
                             title: 'Семья',
                             value: familyMembers.length.toString(),
                             subtitle: 'профилей',
-                            colors: const [Color(0xFF34D399), Color(0xFF059669)],
+                            colors: const [
+                              Color(0xFF34D399),
+                              Color(0xFF059669),
+                            ],
                             icon: Icons.group_rounded,
-                            onTap: () => Navigator.pushNamed(context, AppRoutes.family),
+                            onTap:
+                                () => Navigator.pushNamed(
+                                  context,
+                                  AppRoutes.family,
+                                ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -293,9 +326,16 @@ class DashboardScreen extends StatelessWidget {
                             title: 'Мало остатка',
                             value: lowStockCount.toString(),
                             subtitle: 'лекарств',
-                            colors: const [Color(0xFFF59E0B), Color(0xFFEA580C)],
+                            colors: const [
+                              Color(0xFFF59E0B),
+                              Color(0xFFEA580C),
+                            ],
                             icon: Icons.inventory_2_outlined,
-                            onTap: () => Navigator.pushNamed(context, AppRoutes.search),
+                            onTap:
+                                () => Navigator.pushNamed(
+                                  context,
+                                  AppRoutes.search,
+                                ),
                           ),
                         ),
                       ],
@@ -323,53 +363,53 @@ class DashboardScreen extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(24),
       child: Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: colors),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-            color: colors.last.withOpacity(0.25),
-          ),
-        ],
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: colors),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+              color: colors.last.withOpacity(0.25),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: Colors.white, size: 24),
+            const SizedBox(height: 18),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.white.withOpacity(0.9),
+              ),
+            ),
+          ],
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: Colors.white, size: 24),
-          const SizedBox(height: 18),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.white.withOpacity(0.9),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildSectionTitle({
     required BuildContext context,
@@ -451,7 +491,10 @@ class DashboardScreen extends StatelessWidget {
         return InkWell(
           onTap: () async {
             if (item.$5 == AppRoutes.addMedicine) {
-              final result = await Navigator.pushNamed(context, AppRoutes.scanBarcode);
+              final result = await Navigator.pushNamed(
+                context,
+                AppRoutes.scanBarcode,
+              );
               if (result != null && result is Map<String, dynamic>) {
                 if (!context.mounted) return;
                 Navigator.pushNamed(
@@ -508,19 +551,18 @@ class DashboardScreen extends StatelessWidget {
   }
 
   Widget _buildIntakeReminders(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return const SizedBox.shrink();
 
     return StreamBuilder<List<ReminderModel>>(
-      stream: _reminderRepository.getRemindersByUser(user.uid),
+      stream: _reminderRepository.getRemindersByUser(user.id),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final reminders = (snapshot.data ?? [])
-            .where((r) => r.enabled)
-            .toList();
+        final reminders =
+            (snapshot.data ?? []).where((r) => r.enabled).toList();
 
         if (reminders.isEmpty) {
           return Container(
@@ -568,17 +610,17 @@ class DashboardScreen extends StatelessWidget {
   }
 
   Widget _buildInventoryAlerts(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
 
     if (user == null) {
       return const SizedBox.shrink();
     }
 
     return StreamBuilder<List<MedicineModel>>(
-      stream: _medicineRepository.getMedicinesByUser(user.uid),
+      stream: _medicineRepository.getMedicinesByUser(user.id),
       builder: (context, medicineSnapshot) {
         return StreamBuilder<List<B2BInventoryModel>>(
-          stream: _b2bRepository.getItemsByUser(user.uid),
+          stream: _b2bRepository.getItemsByUser(user.id),
           builder: (context, b2bSnapshot) {
             if (medicineSnapshot.connectionState == ConnectionState.waiting ||
                 b2bSnapshot.connectionState == ConnectionState.waiting) {
@@ -586,7 +628,9 @@ class DashboardScreen extends StatelessWidget {
             }
 
             if (medicineSnapshot.hasError || b2bSnapshot.hasError) {
-              return Text('Ошибка: ${medicineSnapshot.error ?? b2bSnapshot.error}');
+              return Text(
+                'Ошибка: ${medicineSnapshot.error ?? b2bSnapshot.error}',
+              );
             }
 
             final medicines = medicineSnapshot.data ?? [];
@@ -611,103 +655,112 @@ class DashboardScreen extends StatelessWidget {
             if (expiringMedicines.isEmpty &&
                 lowStockMedicines.isEmpty &&
                 b2bLowStock.isEmpty) {
-          return Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                  color: Colors.black.withOpacity(0.04),
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                      color: Colors.black.withOpacity(0.04),
+                    ),
+                  ],
                 ),
+                child: Text(
+                  'Срок годности и остаток в порядке',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              );
+            }
+
+            final List<Widget> cards = [];
+
+            if (expiringMedicines.isNotEmpty) {
+              final medicine = expiringMedicines.first;
+              final daysLeft = medicine.expiryDate!.difference(now).inDays;
+
+              cards.add(
+                _todayCard(
+                  context: context,
+                  title: medicine.name,
+                  subtitle: 'Срок истекает через $daysLeft дн.',
+                  badge: 'Срок',
+                  badgeColor:
+                      Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFF7F1D1D).withOpacity(0.3)
+                          : const Color(0xFFFEE2E2),
+                  badgeTextColor:
+                      Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFFEF4444)
+                          : const Color(0xFFDC2626),
+                  icon: Icons.warning_amber_rounded,
+                ),
+              );
+            }
+
+            if (lowStockMedicines.isNotEmpty) {
+              final medicine = lowStockMedicines.first;
+
+              cards.add(
+                _todayCard(
+                  context: context,
+                  title: medicine.name,
+                  subtitle: 'Осталось ${medicine.quantity} шт',
+                  badge: 'Мало',
+                  badgeColor:
+                      Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFF7C2D12).withOpacity(0.3)
+                          : const Color(0xFFFFEDD5),
+                  badgeTextColor:
+                      Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFFFB923C)
+                          : const Color(0xFFEA580C),
+                  icon: Icons.inventory_2_outlined,
+                ),
+              );
+            }
+
+            if (b2bLowStock.isNotEmpty) {
+              final item = b2bLowStock.first;
+
+              cards.add(
+                _todayCard(
+                  context: context,
+                  title: item.name,
+                  subtitle: 'B2B: Осталось ${item.stock} шт',
+                  badge: 'B2B',
+                  badgeColor:
+                      Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFF064E3B).withOpacity(0.3)
+                          : const Color(0xFFD1FAE5),
+                  badgeTextColor:
+                      Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFF10B981)
+                          : const Color(0xFF059669),
+                  icon: Icons.business_center_rounded,
+                ),
+              );
+            }
+
+            return Column(
+              children: [
+                for (int i = 0; i < cards.length; i++) ...[
+                  cards[i],
+                  if (i != cards.length - 1) const SizedBox(height: 12),
+                ],
               ],
-            ),
-            child: Text(
-              'Срок годности и остаток в порядке',
-              style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
-            ),
-          );
-        }
-
-        final List<Widget> cards = [];
-
-        if (expiringMedicines.isNotEmpty) {
-          final medicine = expiringMedicines.first;
-          final daysLeft = medicine.expiryDate!.difference(now).inDays;
-
-          cards.add(
-            _todayCard(
-              context: context,
-              title: medicine.name,
-              subtitle: 'Срок истекает через $daysLeft дн.',
-              badge: 'Срок',
-              badgeColor: Theme.of(context).brightness == Brightness.dark
-                  ? const Color(0xFF7F1D1D).withOpacity(0.3)
-                  : const Color(0xFFFEE2E2),
-              badgeTextColor: Theme.of(context).brightness == Brightness.dark
-                  ? const Color(0xFFEF4444)
-                  : const Color(0xFFDC2626),
-              icon: Icons.warning_amber_rounded,
-            ),
-          );
-        }
-
-        if (lowStockMedicines.isNotEmpty) {
-          final medicine = lowStockMedicines.first;
-
-          cards.add(
-            _todayCard(
-              context: context,
-              title: medicine.name,
-              subtitle: 'Осталось ${medicine.quantity} шт',
-              badge: 'Мало',
-              badgeColor: Theme.of(context).brightness == Brightness.dark
-                  ? const Color(0xFF7C2D12).withOpacity(0.3)
-                  : const Color(0xFFFFEDD5),
-              badgeTextColor: Theme.of(context).brightness == Brightness.dark
-                  ? const Color(0xFFFB923C)
-                  : const Color(0xFFEA580C),
-              icon: Icons.inventory_2_outlined,
-            ),
-          );
-        }
-
-        if (b2bLowStock.isNotEmpty) {
-          final item = b2bLowStock.first;
-
-          cards.add(
-            _todayCard(
-              context: context,
-              title: item.name,
-              subtitle: 'B2B: Осталось ${item.stock} шт',
-              badge: 'B2B',
-              badgeColor: Theme.of(context).brightness == Brightness.dark
-                  ? const Color(0xFF064E3B).withOpacity(0.3)
-                  : const Color(0xFFD1FAE5),
-              badgeTextColor: Theme.of(context).brightness == Brightness.dark
-                  ? const Color(0xFF10B981)
-                  : const Color(0xFF059669),
-              icon: Icons.business_center_rounded,
-            ),
-          );
-        }
-
-        return Column(
-          children: [
-            for (int i = 0; i < cards.length; i++) ...[
-              cards[i],
-              if (i != cards.length - 1) const SizedBox(height: 12),
-            ],
-          ],
+            );
+          },
         );
       },
-      );
-    },
-  );
-}
+    );
+  }
 
   Widget _todayCard({
     required BuildContext context,
@@ -788,14 +841,14 @@ class DashboardScreen extends StatelessWidget {
   }
 
   Widget _buildMedicinesSection(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
 
     if (user == null) {
       return const Text('Пользователь не найден');
     }
 
     return StreamBuilder<List<MedicineModel>>(
-      stream: _medicineRepository.getMedicinesByUser(user.uid),
+      stream: _medicineRepository.getMedicinesByUser(user.id),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -817,7 +870,10 @@ class DashboardScreen extends StatelessWidget {
             ),
             child: Text(
               'Пока нет добавленных лекарств',
-              style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           );
         }
@@ -856,9 +912,11 @@ class DashboardScreen extends StatelessWidget {
                             width: 50,
                             height: 50,
                             decoration: BoxDecoration(
-                              color: Theme.of(context).brightness == Brightness.dark
-                                  ? const Color(0xFF1E3A8A).withOpacity(0.3)
-                                  : const Color(0xFFDBEAFE),
+                              color:
+                                  Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? const Color(0xFF1E3A8A).withOpacity(0.3)
+                                      : const Color(0xFFDBEAFE),
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: Icon(
@@ -876,7 +934,8 @@ class DashboardScreen extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w800,
-                                    color: Theme.of(context).colorScheme.onSurface,
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -884,7 +943,10 @@ class DashboardScreen extends StatelessWidget {
                                   '${medicine.dosage} • ${medicine.category}',
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    color:
+                                        Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                               ],
@@ -896,7 +958,10 @@ class DashboardScreen extends StatelessWidget {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                              color:
+                                  Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerHighest,
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
@@ -998,54 +1063,55 @@ class DashboardScreen extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Добавить лекарство',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
+      builder:
+          (context) => Container(
+            padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: _selectionCard(
-                    context: context,
-                    title: 'Сканировать',
-                    subtitle: 'Штрих-код',
-                    icon: Icons.qr_code_scanner_rounded,
-                    color: const Color(0xFF2563EB),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, AppRoutes.scanBarcode);
-                    },
+                Text(
+                  'Добавить лекарство',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _selectionCard(
-                    context: context,
-                    title: 'Вручную',
-                    subtitle: 'Ввести данные',
-                    icon: Icons.edit_note_rounded,
-                    color: const Color(0xFF16A34A),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, AppRoutes.addMedicine);
-                    },
-                  ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _selectionCard(
+                        context: context,
+                        title: 'Сканировать',
+                        subtitle: 'Штрих-код',
+                        icon: Icons.qr_code_scanner_rounded,
+                        color: const Color(0xFF2563EB),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.pushNamed(context, AppRoutes.scanBarcode);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _selectionCard(
+                        context: context,
+                        title: 'Вручную',
+                        subtitle: 'Ввести данные',
+                        icon: Icons.edit_note_rounded,
+                        color: const Color(0xFF16A34A),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.pushNamed(context, AppRoutes.addMedicine);
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
-      ),
+          ),
     );
   }
 
@@ -1082,10 +1148,7 @@ class DashboardScreen extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               subtitle,
-              style: TextStyle(
-                fontSize: 12,
-                color: color.withOpacity(0.8),
-              ),
+              style: TextStyle(fontSize: 12, color: color.withOpacity(0.8)),
             ),
           ],
         ),
@@ -1134,7 +1197,11 @@ class _DashboardBottomNav extends StatelessWidget {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color:
-                      isActive ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.15) : Colors.transparent,
+                      isActive
+                          ? Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: 0.15)
+                          : Colors.transparent,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(
@@ -1142,7 +1209,9 @@ class _DashboardBottomNav extends StatelessWidget {
                   color:
                       isActive
                           ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                          : Theme.of(
+                            context,
+                          ).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                 ),
               ),
             );

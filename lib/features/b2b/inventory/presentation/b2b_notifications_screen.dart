@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/router/app_routes.dart';
@@ -58,7 +58,7 @@ class _B2BNotificationsScreenState extends State<B2BNotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -76,15 +76,13 @@ class _B2BNotificationsScreenState extends State<B2BNotificationsScreen> {
           user == null
               ? const Center(child: Text('Пользователь не найден'))
               : StreamBuilder<List<B2BInventoryModel>>(
-                stream: _repository.getItemsByUser(user.uid),
+                stream: _repository.getItemsByUser(user.id),
                 builder: (context, inventorySnapshot) {
                   return StreamBuilder<List<B2BSaleModel>>(
-                    stream: _salesRepository.getSalesByUser(user.uid),
+                    stream: _salesRepository.getSalesByUser(user.id),
                     builder: (context, salesSnapshot) {
                       return StreamBuilder<List<B2BLocationModel>>(
-                        stream: _locationRepository.getLocationsByUser(
-                          user.uid,
-                        ),
+                        stream: _locationRepository.getLocationsByUser(user.id),
                         builder: (context, locationsSnapshot) {
                           if (inventorySnapshot.connectionState ==
                                   ConnectionState.waiting ||

@@ -1,7 +1,6 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ThemeProvider extends ChangeNotifier {
   static final ThemeProvider instance = ThemeProvider._internal();
@@ -18,15 +17,15 @@ class ThemeProvider extends ChangeNotifier {
     _loadTheme();
   }
 
-  /// Toggle theme, save to SharedPreferences and Firestore (if logged in)
+  /// Toggle theme, save to SharedPreferences and Supabase (if logged in)
   void toggleTheme(bool isDark) {
     _themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
     _saveThemeLocally(isDark);
-    _saveThemeToFirestore(isDark);
+    _saveThemeToSupabase(isDark);
     notifyListeners();
   }
 
-  /// Load theme: first try Firestore (if logged in), else SharedPreferences
+  /// Load theme: first try local prefs, then Supabase if logged in.
   Future<void> _loadTheme() async {
     // 1. Try local prefs first for instant startup
     final prefs = await SharedPreferences.getInstance();
@@ -36,47 +35,44 @@ class ThemeProvider extends ChangeNotifier {
       notifyListeners();
     }
 
-    // 2. Then try Firestore for the logged-in user
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
     if (user != null) {
       try {
-        final doc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
-        if (doc.exists) {
-          final data = doc.data();
-          final firestoreIsDark = data?['isDarkTheme'] as bool?;
-          if (firestoreIsDark != null) {
-            _themeMode = firestoreIsDark ? ThemeMode.dark : ThemeMode.light;
-            await prefs.setBool(_themeKey, firestoreIsDark);
-            notifyListeners();
-          }
+        final data =
+            await Supabase.instance.client
+                .from('profiles')
+                .select('is_dark_theme')
+                .eq('id', user.id)
+                .maybeSingle();
+        final remoteIsDark = data?['is_dark_theme'] as bool?;
+        if (remoteIsDark != null) {
+          _themeMode = remoteIsDark ? ThemeMode.dark : ThemeMode.light;
+          await prefs.setBool(_themeKey, remoteIsDark);
+          notifyListeners();
         }
       } catch (_) {
-        // Firestore unavailable — use local value
+        // Remote theme unavailable; keep local value.
       }
     }
   }
 
-  /// Re-load theme from Firestore after login
-  Future<void> reloadFromFirestore() async {
-    final user = FirebaseAuth.instance.currentUser;
+  /// Re-load theme from Supabase after login.
+  Future<void> reloadFromSupabase() async {
+    final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      if (doc.exists) {
-        final data = doc.data();
-        final firestoreIsDark = data?['isDarkTheme'] as bool?;
-        if (firestoreIsDark != null) {
-          _themeMode = firestoreIsDark ? ThemeMode.dark : ThemeMode.light;
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool(_themeKey, firestoreIsDark);
-          notifyListeners();
-        }
+      final data =
+          await Supabase.instance.client
+              .from('profiles')
+              .select('is_dark_theme')
+              .eq('id', user.id)
+              .maybeSingle();
+      final remoteIsDark = data?['is_dark_theme'] as bool?;
+      if (remoteIsDark != null) {
+        _themeMode = remoteIsDark ? ThemeMode.dark : ThemeMode.light;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(_themeKey, remoteIsDark);
+        notifyListeners();
       }
     } catch (_) {}
   }
@@ -86,14 +82,14 @@ class ThemeProvider extends ChangeNotifier {
     await prefs.setBool(_themeKey, isDark);
   }
 
-  Future<void> _saveThemeToFirestore(bool isDark) async {
-    final user = FirebaseAuth.instance.currentUser;
+  Future<void> _saveThemeToSupabase(bool isDark) async {
+    final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
     try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .update({'isDarkTheme': isDark});
+      await Supabase.instance.client
+          .from('profiles')
+          .update({'is_dark_theme': isDark})
+          .eq('id', user.id);
     } catch (_) {}
   }
 }

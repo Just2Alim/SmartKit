@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/router/app_routes.dart';
@@ -105,7 +105,7 @@ class AiRecommendationsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
 
     return Scaffold(
       appBar: AppBar(title: const Text('AI рекомендации')),
@@ -113,7 +113,7 @@ class AiRecommendationsScreen extends StatelessWidget {
           user == null
               ? const Center(child: Text('Пользователь не найден'))
               : StreamBuilder<List<MedicineModel>>(
-                stream: _medicineRepository.getMedicinesByUser(user.uid),
+                stream: _medicineRepository.getMedicinesByUser(user.id),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());

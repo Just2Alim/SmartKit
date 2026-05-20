@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/router/app_routes.dart';
-import '../../../../core/services/firebase_auth_service.dart';
+import '../../../../core/services/supabase_auth_service.dart';
 
 class B2BSettingsScreen extends StatefulWidget {
   const B2BSettingsScreen({super.key});
@@ -56,7 +56,7 @@ class _B2BSettingsScreenState extends State<B2BSettingsScreen> {
 
     if (confirm != true) return;
 
-    final authService = FirebaseAuthService();
+    final authService = SupabaseAuthService();
     await authService.signOut();
 
     if (!context.mounted) return;

@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class B2BLocationModel {
   final String id;
   final String userId;
@@ -25,25 +23,27 @@ class B2BLocationModel {
 
   Map<String, dynamic> toMap() {
     return {
-      'userId': userId,
+      'organization_id': userId,
       'name': name,
       'type': type,
       'address': address,
-      'currentItems': currentItems,
+      'current_items': currentItems,
       'capacity': capacity,
       'status': status,
     };
   }
 
-  factory B2BLocationModel.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data()!;
+  factory B2BLocationModel.fromMap(Map<String, dynamic> data) {
     return B2BLocationModel(
-      id: doc.id,
-      userId: data['userId'] ?? '',
+      id: data['id'] ?? '',
+      userId: data['organization_id'] ?? data['userId'] ?? '',
       name: data['name'] ?? '',
       type: data['type'] ?? 'Storage',
       address: data['address'] ?? '',
-      currentItems: (data['currentItems'] as num?)?.toInt() ?? 0,
+      currentItems:
+          (data['current_items'] as num?)?.toInt() ??
+          (data['currentItems'] as num?)?.toInt() ??
+          0,
       capacity: (data['capacity'] as num?)?.toInt() ?? 0,
       status: data['status'] ?? 'Active',
     );

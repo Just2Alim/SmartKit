@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/router/app_routes.dart';
@@ -51,15 +51,25 @@ class _SearchScreenState extends State<SearchScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     switch (category.toLowerCase()) {
       case 'обезболивающее':
-        return isDark ? const Color(0xFF1E3A8A).withOpacity(0.3) : const Color(0xFFDBEAFE);
+        return isDark
+            ? const Color(0xFF1E3A8A).withOpacity(0.3)
+            : const Color(0xFFDBEAFE);
       case 'антибиотик':
-        return isDark ? const Color(0xFF7F1D1D).withOpacity(0.3) : const Color(0xFFFEE2E2);
+        return isDark
+            ? const Color(0xFF7F1D1D).withOpacity(0.3)
+            : const Color(0xFFFEE2E2);
       case 'витамины':
-        return isDark ? const Color(0xFF78350F).withOpacity(0.3) : const Color(0xFFFEF3C7);
+        return isDark
+            ? const Color(0xFF78350F).withOpacity(0.3)
+            : const Color(0xFFFEF3C7);
       case 'противовоспалительное':
-        return isDark ? const Color(0xFF4C1D95).withOpacity(0.3) : const Color(0xFFEDE9FE);
+        return isDark
+            ? const Color(0xFF4C1D95).withOpacity(0.3)
+            : const Color(0xFFEDE9FE);
       default:
-        return isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFF3F4F6);
+        return isDark
+            ? Colors.white.withOpacity(0.05)
+            : const Color(0xFFF3F4F6);
     }
   }
 
@@ -80,10 +90,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
 
     return Scaffold(
-
       appBar: AppBar(
         title: const Text('Лекарства'),
         actions: [
@@ -100,7 +109,7 @@ class _SearchScreenState extends State<SearchScreen> {
             user == null
                 ? const Center(child: Text('Пользователь не найден'))
                 : StreamBuilder<List<MedicineModel>>(
-                  stream: _repository.getMedicinesByUser(user.uid),
+                  stream: _repository.getMedicinesByUser(user.id),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
@@ -169,14 +178,20 @@ class _SearchScreenState extends State<SearchScreen> {
                                     decoration: BoxDecoration(
                                       color:
                                           isSelected
-                                              ? Theme.of(context).colorScheme.primary
+                                              ? Theme.of(
+                                                context,
+                                              ).colorScheme.primary
                                               : Theme.of(context).cardColor,
                                       borderRadius: BorderRadius.circular(999),
                                       border: Border.all(
                                         color:
                                             isSelected
-                                                ? Theme.of(context).colorScheme.primary
-                                                : Theme.of(context).colorScheme.outlineVariant,
+                                                ? Theme.of(
+                                                  context,
+                                                ).colorScheme.primary
+                                                : Theme.of(
+                                                  context,
+                                                ).colorScheme.outlineVariant,
                                       ),
                                     ),
                                     child: Text(
@@ -187,7 +202,9 @@ class _SearchScreenState extends State<SearchScreen> {
                                         color:
                                             isSelected
                                                 ? Colors.white
-                                                : Theme.of(context).colorScheme.onSurfaceVariant,
+                                                : Theme.of(
+                                                  context,
+                                                ).colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                   ),
@@ -217,7 +234,10 @@ class _SearchScreenState extends State<SearchScreen> {
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
                                             fontSize: 14,
-                                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                            color:
+                                                Theme.of(
+                                                  context,
+                                                ).colorScheme.onSurfaceVariant,
                                           ),
                                         ),
                                       ),
@@ -241,7 +261,10 @@ class _SearchScreenState extends State<SearchScreen> {
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
                                             fontSize: 14,
-                                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                            color:
+                                                Theme.of(
+                                                  context,
+                                                ).colorScheme.onSurfaceVariant,
                                           ),
                                         ),
                                       ),
@@ -318,7 +341,10 @@ class _SearchScreenState extends State<SearchScreen> {
                                                         fontSize: 16,
                                                         fontWeight:
                                                             FontWeight.w800,
-                                                        color: Theme.of(context).colorScheme.onSurface,
+                                                        color:
+                                                            Theme.of(context)
+                                                                .colorScheme
+                                                                .onSurface,
                                                       ),
                                                     ),
                                                     const SizedBox(height: 4),
@@ -326,7 +352,10 @@ class _SearchScreenState extends State<SearchScreen> {
                                                       '${medicine.category} • ${medicine.dosage}',
                                                       style: TextStyle(
                                                         fontSize: 13,
-                                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                        color:
+                                                            Theme.of(context)
+                                                                .colorScheme
+                                                                .onSurfaceVariant,
                                                       ),
                                                     ),
                                                     const SizedBox(height: 6),
@@ -339,7 +368,10 @@ class _SearchScreenState extends State<SearchScreen> {
                                                         fontSize: 12,
                                                         fontWeight:
                                                             FontWeight.w700,
-                                                        color: Theme.of(context).colorScheme.primary,
+                                                        color:
+                                                            Theme.of(context)
+                                                                .colorScheme
+                                                                .primary,
                                                       ),
                                                     ),
                                                   ],
@@ -352,7 +384,10 @@ class _SearchScreenState extends State<SearchScreen> {
                                                       vertical: 6,
                                                     ),
                                                 decoration: BoxDecoration(
-                                                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                                  color:
+                                                      Theme.of(context)
+                                                          .colorScheme
+                                                          .surfaceContainerHighest,
                                                   borderRadius:
                                                       BorderRadius.circular(
                                                         999,
@@ -363,7 +398,10 @@ class _SearchScreenState extends State<SearchScreen> {
                                                   style: TextStyle(
                                                     fontSize: 12,
                                                     fontWeight: FontWeight.w700,
-                                                    color: Theme.of(context).colorScheme.onSurface,
+                                                    color:
+                                                        Theme.of(
+                                                          context,
+                                                        ).colorScheme.onSurface,
                                                   ),
                                                 ),
                                               ),

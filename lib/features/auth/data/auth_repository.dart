@@ -1,39 +1,54 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import '../../../core/services/firebase_auth_service.dart';
-import '../../../core/services/firestore_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../../core/services/supabase_auth_service.dart';
 import '../models/app_user.dart';
 
 class AuthRepository {
-  final FirebaseAuthService _authService = FirebaseAuthService();
-  final FirestoreService _firestoreService = FirestoreService();
+  final SupabaseAuthService _authService = SupabaseAuthService();
+  SupabaseClient get _client => Supabase.instance.client;
 
   Future<void> signUp({
     required String email,
     required String password,
     required String role,
     String? name,
+    String? companyName,
+    String? bin,
     bool isDarkTheme = false,
   }) async {
-    final userCredential = await _authService.signUp(
+    final response = await _authService.signUp(
       email: email,
       password: password,
+      data: {
+        'role': role,
+        if (name != null) 'name': name,
+        if (role == 'b2b') 'companyName': companyName ?? name,
+        if (bin != null) 'bin': bin,
+        'isDarkTheme': isDarkTheme,
+      },
     );
 
-    final firebaseUser = userCredential.user;
-    if (firebaseUser == null) {
+    final user = response.user;
+    if (user == null) {
       throw Exception('Пользователь не создан');
     }
 
     final appUser = AppUser(
-      uid: firebaseUser.uid,
+      id: user.id,
       email: email,
       role: role,
       name: name,
+      companyName: role == 'b2b' ? companyName ?? name : null,
+      bin: bin,
       createdAt: DateTime.now(),
       isDarkTheme: isDarkTheme,
     );
 
-    await _firestoreService.createUser(appUser);
+    await _upsertProfile(appUser);
+
+    if (role == 'b2b') {
+      await _ensureOrganization(companyName ?? name ?? email, bin: bin);
+    }
   }
 
   Future<void> signIn({required String email, required String password}) async {
@@ -45,54 +60,97 @@ class AuthRepository {
   }
 
   Future<AppUser?> getCurrentAppUser() async {
-    final firebaseUser = _authService.currentUser;
-    if (firebaseUser == null) return null;
+    final user = _authService.currentUser;
+    if (user == null) return null;
 
-    return _firestoreService.getUserById(firebaseUser.uid);
+    final data =
+        await _client.from('profiles').select().eq('id', user.id).maybeSingle();
+
+    if (data == null) {
+      final appUser = AppUser(
+        id: user.id,
+        email: user.email ?? '',
+        role: (user.userMetadata?['role'] ?? 'b2c').toString(),
+        name: user.userMetadata?['name']?.toString(),
+        companyName: user.userMetadata?['companyName']?.toString(),
+        bin: user.userMetadata?['bin']?.toString(),
+        createdAt: DateTime.now(),
+      );
+      await _upsertProfile(appUser);
+      return appUser;
+    }
+
+    return AppUser.fromMap(Map<String, dynamic>.from(data));
   }
 
   Future<void> updateProfile({
-    required String uid,
+    required String id,
     String? name,
     String? email,
     String? newPassword,
     String? currentPassword,
   }) async {
-    final firebaseUser = _authService.currentUser;
-    if (firebaseUser == null || firebaseUser.uid != uid) {
+    final user = _authService.currentUser;
+    if (user == null || user.id != id) {
       throw Exception('Пользователь не авторизован');
-    }
-
-    if (email != null && email != firebaseUser.email) {
-      await firebaseUser.verifyBeforeUpdateEmail(email);
     }
 
     if (newPassword != null && newPassword.isNotEmpty) {
       if (currentPassword == null || currentPassword.isEmpty) {
         throw Exception('Для изменения пароля нужен текущий пароль');
       }
-      final cred = EmailAuthProvider.credential(
-        email: firebaseUser.email!,
+      await _authService.signIn(
+        email: user.email ?? email ?? '',
         password: currentPassword,
       );
-      await firebaseUser.reauthenticateWithCredential(cred);
-      await firebaseUser.updatePassword(newPassword);
     }
 
-    final appUser = await _firestoreService.getUserById(uid);
+    await _authService.updateUser(
+      UserAttributes(
+        email: email,
+        password:
+            newPassword != null && newPassword.isNotEmpty ? newPassword : null,
+        data: {if (name != null) 'name': name},
+      ),
+    );
+
+    final appUser = await getCurrentAppUser();
     if (appUser != null) {
       final updatedUser = appUser.copyWith(
         name: name,
         email: email ?? appUser.email,
       );
-      await _firestoreService.updateUser(updatedUser);
+      await _upsertProfile(updatedUser);
     }
   }
 
-  Future<void> updateThemePreference(String uid, bool isDark) async {
-    final appUser = await _firestoreService.getUserById(uid);
-    if (appUser != null) {
-      await _firestoreService.updateUser(appUser.copyWith(isDarkTheme: isDark));
+  Future<void> updateThemePreference(String id, bool isDark) async {
+    await _client
+        .from('profiles')
+        .update({'is_dark_theme': isDark})
+        .eq('id', id);
+  }
+
+  Future<void> _upsertProfile(AppUser user) async {
+    await _client.from('profiles').upsert({
+      'id': user.id,
+      'email': user.email,
+      'role': user.role,
+      'name': user.name,
+      'company_name': user.companyName,
+      'bin': user.bin,
+      'is_dark_theme': user.isDarkTheme,
+    });
+  }
+
+  Future<void> _ensureOrganization(String name, {String? bin}) async {
+    try {
+      await _client.rpc(
+        'create_default_organization',
+        params: {'organization_name': name, 'organization_bin': bin},
+      );
+    } catch (_) {
+      // The auth trigger may have already created the default organization.
     }
   }
 }

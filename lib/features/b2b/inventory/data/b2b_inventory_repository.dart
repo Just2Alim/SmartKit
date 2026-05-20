@@ -1,23 +1,30 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'b2b_organization_resolver.dart';
 import 'b2b_activity_repository.dart';
 import '../models/b2b_activity_model.dart';
 import '../models/b2b_inventory_model.dart';
 
 class B2BInventoryRepository {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final B2BActivityRepository _activityRepository = B2BActivityRepository();
-
-  CollectionReference<Map<String, dynamic>> get _collection =>
-      _firestore.collection('b2b_inventory');
+  final B2BOrganizationResolver _organizationResolver =
+      B2BOrganizationResolver();
+  SupabaseClient get _client => Supabase.instance.client;
 
   Future<String> addItem(B2BInventoryModel item) async {
-    final doc = await _collection.add(item.toMap());
+    final organizationId = await _organizationResolver
+        .resolveForUserOrOrganization(item.userId);
+    final inserted =
+        await _client
+            .from('b2b_inventory')
+            .insert({...item.toMap(), 'organization_id': organizationId})
+            .select('id')
+            .single();
 
     await _activityRepository.logActivity(
       B2BActivityModel(
         id: '',
-        userId: item.userId,
+        userId: organizationId,
         type: B2BActivityType.itemAdded,
         title: item.name,
         description: 'Добавлен новый товар в складской каталог',
@@ -30,7 +37,7 @@ class B2BInventoryRepository {
       ),
     );
 
-    return doc.id;
+    return inserted['id'].toString();
   }
 
   Future<void> updateItem(B2BInventoryModel item) async {
@@ -40,13 +47,18 @@ class B2BInventoryRepository {
 
     final previous = await getItemById(item.id);
     final updated = item.copyWith(updatedAt: DateTime.now());
+    final organizationId = await _organizationResolver
+        .resolveForUserOrOrganization(item.userId);
 
-    await _collection.doc(item.id).update(updated.toMap());
+    await _client
+        .from('b2b_inventory')
+        .update({...updated.toMap(), 'organization_id': organizationId})
+        .eq('id', item.id);
 
     await _activityRepository.logActivity(
       B2BActivityModel(
         id: '',
-        userId: item.userId,
+        userId: organizationId,
         type: B2BActivityType.itemUpdated,
         title: item.name,
         description: 'Обновлены данные товара',
@@ -61,62 +73,77 @@ class B2BInventoryRepository {
   }
 
   Stream<List<B2BInventoryModel>> getItemsByUser(String userId) {
-    return _collection
-        .where('userId', isEqualTo: userId)
-        .snapshots()
-        .map(
-          (snapshot) =>
-              snapshot.docs
-                  .map((doc) => B2BInventoryModel.fromDoc(doc))
-                  .toList(),
-        );
+    return Stream.fromFuture(
+      _organizationResolver.resolveForUserOrOrganization(userId),
+    ).asyncExpand((organizationId) {
+      return _client
+          .from('b2b_inventory')
+          .stream(primaryKey: ['id'])
+          .eq('organization_id', organizationId)
+          .order('name')
+          .map(
+            (rows) =>
+                rows.map((row) => B2BInventoryModel.fromMap(row)).toList(),
+          );
+    });
   }
 
   Stream<List<B2BInventoryModel>> getItemsByLocation(String locationId) {
-    return _collection
-        .where('locationId', isEqualTo: locationId)
-        .snapshots()
+    return _client
+        .from('b2b_inventory')
+        .stream(primaryKey: ['id'])
+        .eq('location_id', locationId)
+        .order('name')
         .map(
-          (snapshot) =>
-              snapshot.docs
-                  .map((doc) => B2BInventoryModel.fromDoc(doc))
-                  .toList(),
+          (rows) => rows.map((row) => B2BInventoryModel.fromMap(row)).toList(),
         );
   }
 
   Stream<List<B2BInventoryModel>> getAllItems() {
-    return _collection.snapshots().map(
-      (snapshot) =>
-          snapshot.docs.map((doc) => B2BInventoryModel.fromDoc(doc)).toList(),
-    );
+    return _client
+        .from('b2b_inventory')
+        .stream(primaryKey: ['id'])
+        .order('name')
+        .map(
+          (rows) => rows.map((row) => B2BInventoryModel.fromMap(row)).toList(),
+        );
   }
 
   Stream<List<B2BInventoryModel>> getPublicCatalogItems() {
-    return getAllItems().map((items) {
-      final visibleItems =
-          items.where((item) => item.name.trim().isNotEmpty).toList()
-            ..sort((a, b) {
-              final categoryCompare = a.category.compareTo(b.category);
-              if (categoryCompare != 0) return categoryCompare;
-              return a.name.compareTo(b.name);
-            });
-      return visibleItems;
-    });
+    return _client
+        .from('b2b_inventory')
+        .stream(primaryKey: ['id'])
+        .eq('is_public', true)
+        .order('category')
+        .map((rows) {
+          final visibleItems =
+              rows
+                  .map((row) => B2BInventoryModel.fromMap(row))
+                  .where((item) => item.name.trim().isNotEmpty)
+                  .toList()
+                ..sort((a, b) {
+                  final categoryCompare = a.category.compareTo(b.category);
+                  if (categoryCompare != 0) return categoryCompare;
+                  return a.name.compareTo(b.name);
+                });
+          return visibleItems;
+        });
   }
 
   Future<B2BInventoryModel?> getItemById(String itemId) async {
-    final doc = await _collection.doc(itemId).get();
-
-    if (!doc.exists || doc.data() == null) {
-      return null;
-    }
-
-    return B2BInventoryModel.fromDoc(doc);
+    final data =
+        await _client
+            .from('b2b_inventory')
+            .select()
+            .eq('id', itemId)
+            .maybeSingle();
+    if (data == null) return null;
+    return B2BInventoryModel.fromMap(Map<String, dynamic>.from(data));
   }
 
   Future<void> deleteItem(String itemId) async {
     final item = await getItemById(itemId);
-    await _collection.doc(itemId).delete();
+    await _client.from('b2b_inventory').delete().eq('id', itemId);
 
     if (item != null) {
       await _activityRepository.logActivity(
@@ -139,10 +166,13 @@ class B2BInventoryRepository {
 
   Future<void> updateStock(String itemId, int newStock) async {
     final item = await getItemById(itemId);
-    await _collection.doc(itemId).update({
-      'stock': newStock,
-      'updatedAt': Timestamp.fromDate(DateTime.now()),
-    });
+    await _client
+        .from('b2b_inventory')
+        .update({
+          'stock': newStock,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', itemId);
 
     if (item != null) {
       await _activityRepository.logActivity(
@@ -176,13 +206,16 @@ class B2BInventoryRepository {
     }
 
     final newStock = item.stock + quantity;
-    await _collection.doc(itemId).update({
-      'stock': newStock,
-      if (batchNumber != null && batchNumber.trim().isNotEmpty)
-        'batchNumber': batchNumber.trim(),
-      if (expiryDate != null) 'expiryDate': Timestamp.fromDate(expiryDate),
-      'updatedAt': Timestamp.fromDate(DateTime.now()),
-    });
+    await _client
+        .from('b2b_inventory')
+        .update({
+          'stock': newStock,
+          if (batchNumber != null && batchNumber.trim().isNotEmpty)
+            'batch_number': batchNumber.trim(),
+          if (expiryDate != null) 'expiry_date': expiryDate.toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', itemId);
 
     await _activityRepository.logActivity(
       B2BActivityModel(
@@ -212,24 +245,24 @@ class B2BInventoryRepository {
     }
 
     late B2BInventoryModel item;
-    final docRef = _collection.doc(itemId);
 
-    await _firestore.runTransaction((transaction) async {
-      final snapshot = await transaction.get(docRef);
-      if (!snapshot.exists || snapshot.data() == null) {
-        throw StateError('Товар не найден');
-      }
+    final latest = await getItemById(itemId);
+    if (latest == null) {
+      throw StateError('Товар не найден');
+    }
 
-      item = B2BInventoryModel.fromDoc(snapshot);
-      if (item.stock < quantity) {
-        throw StateError('Недостаточно товара "${item.name}" на складе');
-      }
+    item = latest;
+    if (item.stock < quantity) {
+      throw StateError('Недостаточно товара "${item.name}" на складе');
+    }
 
-      transaction.update(docRef, {
-        'stock': item.stock - quantity,
-        'updatedAt': Timestamp.fromDate(DateTime.now()),
-      });
-    });
+    await _client
+        .from('b2b_inventory')
+        .update({
+          'stock': item.stock - quantity,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', itemId);
 
     return item;
   }

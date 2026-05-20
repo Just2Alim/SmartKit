@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../../medicine/data/medicine_repository.dart';
@@ -32,10 +32,10 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
   }
 
   Future<void> _loadMedicines() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
 
-    final data = await _medicineRepository.getMedicinesByUser(user.uid).first;
+    final data = await _medicineRepository.getMedicinesByUser(user.id).first;
 
     if (!mounted) return;
 
@@ -69,7 +69,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
   }
 
   Future<void> _saveReminder() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
 
     if (user == null) return;
 
@@ -87,7 +87,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
     try {
       final reminder = ReminderModel(
         id: '',
-        userId: user.uid,
+        userId: user.id,
         medicineId: medicine.id,
         familyMemberId: medicine.familyMemberId,
         title: medicine.name,
@@ -167,7 +167,6 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
             .toList();
 
     return Scaffold(
-
       appBar: AppBar(title: const Text('Добавить напоминание')),
       body: SafeArea(
         child:
@@ -184,7 +183,9 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                         decoration: BoxDecoration(
                           color: Theme.of(context).cardColor,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
                         ),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
@@ -219,7 +220,10 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                           decoration: BoxDecoration(
                             color: Theme.of(context).cardColor,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                            border: Border.all(
+                              color:
+                                  Theme.of(context).colorScheme.outlineVariant,
+                            ),
                           ),
                           child: Row(
                             children: [
@@ -234,8 +238,12 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                                 style: TextStyle(
                                   color:
                                       selectedTime == null
-                                          ? Theme.of(context).colorScheme.onSurfaceVariant
-                                          : Theme.of(context).colorScheme.onSurface,
+                                          ? Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant
+                                          : Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface,
                                 ),
                               ),
                             ],

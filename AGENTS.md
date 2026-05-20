@@ -22,7 +22,7 @@
 - [x] **Empty-State Stability**: Fixed B2B add/report flows so empty locations, sales, or inventory no longer cause infinite loading.
 - [x] **Unified Theme & Dark Mode Pass**: Added shared theme tokens, reusable UI primitives, and dark-mode-safe surfaces across core B2B and shop flows.
 - [x] **Analytics Data Consistency**: Resolved the "missing products" issue by normalizing category naming (casing/whitespace) in aggregation logic and instrumenting streams for verification.
-- [ ] **Activity Detail/Navigation**: Add a dedicated screen to view the full history of activities, including filtering by type.
+- [x] **Activity Detail/Navigation**: Added a dedicated screen to view the full history of activities, including filtering by type.
 
 ## Completed Work
 - **Unified Design System & Dark Mode**:
@@ -33,7 +33,7 @@
   - Updated the B2C shop catalog, product detail, and cart quantity text to respect dark-mode surfaces and text colors.
 - **B2B Flow Stabilization**:
   - Made activity logging non-blocking so product creation, stock updates, and sales do not fail if activity writes are unavailable.
-  - Removed Firestore `orderBy` dependency from sales/activity streams and moved sorting client-side to avoid missing-index failures.
+  - Removed backend ordering dependency from sales/activity streams and kept client-side sorting for stable realtime updates.
   - Added timeout-safe location loading in `B2BAddMedicineScreen`; products can be added even when no locations exist.
   - Changed `B2BReportsScreen` to render zero-state analytics from empty lists instead of waiting forever for empty streams.
   - Updated the public shop catalog to show every created product, including zero-stock items, with live stock badges and disabled buying when stock is unavailable.
@@ -62,14 +62,19 @@
   - Created `B2BActivityModel` and `B2BActivityRepository`.
   - Integrated automatic logging into Sales, Inventory, and Locations repositories.
   - Refactored `B2BDashboardScreen` to show a live stream of recent business activities.
+  - Added `B2BActivityHistoryScreen` with type filters and dashboard navigation.
+- **B2B Team Access**:
+  - Replaced static team mock data with live Supabase `organization_members`.
+  - Added owner/admin member management, role updates, disabling/removing access, and email-based invites.
+  - Added invite activation on signup so invited users join the organization and receive B2B access.
 - **B2B UI/UX Overhaul**:
   - **Emerald Design System**: Systematically replaced all legacy blue/purple themes with a professional Emerald palette (#10B981) across the entire B2B suite.
   - **Premium Dashboard**: Rebuilt `B2BDashboardScreen` with a sliver-based layout, gradient headers, and business-centric cards.
   - **Analytics & Reports**: Modernized `B2BReportsScreen` and `B2BSalesHistoryScreen` with rich data visualization, custom sliver scroll effects, and professional typography.
   - **Floating Navigation**: Updated `B2BMainScreen` with a modern, floating bottom bar for better ergonomics.
-  - **Data Integration**: Connected the dashboard and reports to live Firestore streams for real-time inventory and sales tracking.
+  - **Data Integration**: Connected the dashboard and reports to live Supabase realtime streams for real-time inventory and sales tracking.
 - **B2B & Shop Integration**:
-  - **Dynamic Shop**: Refactored `ShopScreen` to fetch real items from Firestore B2B Inventory.
+  - **Dynamic Shop**: Refactored `ShopScreen` to fetch real items from PostgreSQL B2B inventory.
   - **Checkout Logic**: Implemented full checkout cycle in `CartScreen` with stock reduction and sales recording.
   - **Data Seeding**: Expanded `DbSeeder` with 10+ diverse medical products for testing.
 - **AI & Safety Protocols**:

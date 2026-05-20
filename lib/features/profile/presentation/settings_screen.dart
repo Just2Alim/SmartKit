@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/router/app_routes.dart';
-import '../../../core/services/firebase_auth_service.dart';
+import '../../../core/services/supabase_auth_service.dart';
 import '../../../core/theme/theme_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -17,7 +17,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool expiryNotifications = true;
 
   Future<void> _logout(BuildContext context) async {
-    final authService = FirebaseAuthService();
+    final authService = SupabaseAuthService();
     await authService.signOut();
 
     if (!context.mounted) return;
@@ -32,7 +32,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-
       appBar: AppBar(title: const Text('Настройки')),
       body: SafeArea(
         child: ListView(

@@ -1,7 +1,7 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/router/app_routes.dart';
+import '../../../auth/data/auth_repository.dart';
 
 class B2BLoginScreen extends StatefulWidget {
   const B2BLoginScreen({super.key});
@@ -13,6 +13,7 @@ class B2BLoginScreen extends StatefulWidget {
 class _B2BLoginScreenState extends State<B2BLoginScreen> {
   final emailCtrl = TextEditingController();
   final passwordCtrl = TextEditingController();
+  final _authRepository = AuthRepository();
 
   bool isLoading = false;
   bool obscurePassword = true;
@@ -26,16 +27,16 @@ class _B2BLoginScreenState extends State<B2BLoginScreen> {
 
   Future<void> _login() async {
     if (emailCtrl.text.trim().isEmpty || passwordCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Заполните email и пароль')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Заполните email и пароль')));
       return;
     }
 
     setState(() => isLoading = true);
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      await _authRepository.signIn(
         email: emailCtrl.text.trim(),
         password: passwordCtrl.text.trim(),
       );
@@ -50,9 +51,9 @@ class _B2BLoginScreenState extends State<B2BLoginScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка входа: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Ошибка входа: $e')));
     } finally {
       if (mounted) {
         setState(() => isLoading = false);
@@ -64,9 +65,7 @@ class _B2BLoginScreenState extends State<B2BLoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('B2B вход'),
-      ),
+      appBar: AppBar(title: const Text('B2B вход')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
@@ -101,17 +100,11 @@ class _B2BLoginScreenState extends State<B2BLoginScreen> {
               const Text(
                 'Управляйте складом и отчётами SmartKit',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF6B7280),
-                ),
+                style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
               ),
               const SizedBox(height: 32),
 
-              Align(
-                alignment: Alignment.centerLeft,
-                child: _label('Email'),
-              ),
+              Align(alignment: Alignment.centerLeft, child: _label('Email')),
               TextField(
                 controller: emailCtrl,
                 keyboardType: TextInputType.emailAddress,
@@ -121,10 +114,7 @@ class _B2BLoginScreenState extends State<B2BLoginScreen> {
               ),
               const SizedBox(height: 16),
 
-              Align(
-                alignment: Alignment.centerLeft,
-                child: _label('Пароль'),
-              ),
+              Align(alignment: Alignment.centerLeft, child: _label('Пароль')),
               TextField(
                 controller: passwordCtrl,
                 obscureText: obscurePassword,
@@ -151,22 +141,23 @@ class _B2BLoginScreenState extends State<B2BLoginScreen> {
                 height: 54,
                 child: ElevatedButton(
                   onPressed: isLoading ? null : _login,
-                  child: isLoading
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+                  child:
+                      isLoading
+                          ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                          : const Text(
+                            'Войти',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
-                        )
-                      : const Text(
-                          'Войти',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
                 ),
               ),
 

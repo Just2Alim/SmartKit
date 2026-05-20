@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class B2BSaleModel {
   final String id;
   final String userId; // ID владельца бизнеса
@@ -23,31 +21,33 @@ class B2BSaleModel {
 
   Map<String, dynamic> toMap() {
     return {
-      'userId': userId,
+      'organization_id': userId,
       'items': items,
-      'totalAmount': totalAmount,
-      'saleDate': Timestamp.fromDate(saleDate),
-      'customerId': customerId,
-      'staffName': staffName,
+      'total_amount': totalAmount,
+      'sale_date': saleDate.toIso8601String(),
+      'customer_id': customerId,
+      'staff_name': staffName,
     };
   }
 
-  factory B2BSaleModel.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data()!;
+  factory B2BSaleModel.fromMap(Map<String, dynamic> data) {
     DateTime parseDate(dynamic value) {
-      if (value is Timestamp) return value.toDate();
+      if (value is DateTime) return value;
       if (value is String) return DateTime.tryParse(value) ?? DateTime.now();
       return DateTime.now();
     }
 
     return B2BSaleModel(
-      id: doc.id,
-      userId: data['userId'] ?? '',
+      id: data['id'] ?? '',
+      userId: data['organization_id'] ?? data['userId'] ?? '',
       items: List<Map<String, dynamic>>.from(data['items'] ?? []),
-      totalAmount: (data['totalAmount'] as num?)?.toInt() ?? 0,
-      saleDate: parseDate(data['saleDate']),
-      customerId: data['customerId'],
-      staffName: data['staffName'],
+      totalAmount:
+          (data['total_amount'] as num?)?.toInt() ??
+          (data['totalAmount'] as num?)?.toInt() ??
+          0,
+      saleDate: parseDate(data['sale_date'] ?? data['saleDate']),
+      customerId: data['customer_id'] ?? data['customerId'],
+      staffName: data['staff_name'] ?? data['staffName'],
     );
   }
 }

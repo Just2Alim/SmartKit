@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../../family/data/family_repository.dart';
@@ -72,10 +72,10 @@ class _EditMedicineScreenState extends State<EditMedicineScreen> {
 
   Future<void> _loadAll() async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = Supabase.instance.client.auth.currentUser;
       if (user != null) {
         familyMembers =
-            await _familyRepository.getFamilyMembersByUser(user.uid).first;
+            await _familyRepository.getFamilyMembersByUser(user.id).first;
       }
 
       final medicine = await _repository.getMedicineById(widget.medicineId);

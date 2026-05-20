@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import '../data/b2b_locations_repository.dart';
 import '../data/b2b_inventory_repository.dart';
@@ -11,7 +11,7 @@ class B2BLocationsScreen extends StatelessWidget {
   const B2BLocationsScreen({super.key});
 
   void _showLocationDialog(BuildContext context, {B2BLocationModel? location}) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
 
     final nameController = TextEditingController(text: location?.name);
@@ -138,7 +138,7 @@ class B2BLocationsScreen extends StatelessWidget {
                       onPressed: () async {
                         final newLocation = B2BLocationModel(
                           id: location?.id ?? '',
-                          userId: user.uid,
+                          userId: user.id,
                           name: nameController.text,
                           type: selectedType,
                           address: addressController.text,
@@ -175,7 +175,7 @@ class B2BLocationsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
     final locationsRepository = B2BLocationsRepository();
 
     return Scaffold(
@@ -184,7 +184,7 @@ class B2BLocationsScreen extends StatelessWidget {
           user == null
               ? const Center(child: Text('Пользователь не найден'))
               : StreamBuilder<List<B2BLocationModel>>(
-                stream: locationsRepository.getLocationsByUser(user.uid),
+                stream: locationsRepository.getLocationsByUser(user.id),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(
@@ -197,7 +197,7 @@ class B2BLocationsScreen extends StatelessWidget {
                   final locations = snapshot.data ?? [];
 
                   if (locations.isEmpty) {
-                    DbSeeder.seedB2BLocations(user.uid);
+                    DbSeeder.seedB2BLocations(user.id);
                     return const Center(
                       child: CircularProgressIndicator(
                         color: Color(0xFF10B981),

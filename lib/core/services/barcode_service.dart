@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class BarcodeService {
   static const String _openFoodFactsApiUrl =
@@ -11,7 +11,7 @@ class BarcodeService {
       'https://world.openproductsfacts.org/api/v2/product/';
   static const String _openFdaApiUrl = 'https://api.fda.gov/drug/label.json';
 
-  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static SupabaseClient get _client => Supabase.instance.client;
 
   /// Возвращает черновик лекарства всегда, даже если внешний справочник ничего
   /// не знает о коде. Так UI не упирается в ошибку "не найдено".
@@ -73,19 +73,18 @@ class BarcodeService {
           _nonEmpty(medicineData['brand']) ??
           _nonEmpty(medicineData['manufacturer']),
       'dosage': _nonEmpty(medicineData['dosage']),
-      'packageSize': _nonEmpty(medicineData['packageSize']),
-      'batchNumber': _nonEmpty(medicineData['batchNumber']),
-      'updatedAt': FieldValue.serverTimestamp(),
+      'package_size': _nonEmpty(medicineData['packageSize']),
+      'batch_number': _nonEmpty(medicineData['batchNumber']),
+      'updated_at': DateTime.now().toIso8601String(),
       'source': 'SmartKit user scan',
     }..removeWhere((_, value) => value == null);
 
     if ((cleaned['name'] as String?)?.isEmpty ?? true) return;
 
     try {
-      await _firestore
-          .collection('barcode_products')
-          .doc(normalizedBarcode)
-          .set(cleaned, SetOptions(merge: true));
+      await _client
+          .from('barcode_products')
+          .upsert(cleaned, onConflict: 'barcode');
     } catch (e) {
       debugPrint('Barcode remember error: $e');
     }
@@ -95,12 +94,12 @@ class BarcodeService {
     String barcode,
   ) async {
     try {
-      final doc = await _firestore
-          .collection('barcode_products')
-          .doc(barcode)
-          .get()
+      final data = await _client
+          .from('barcode_products')
+          .select()
+          .eq('barcode', barcode)
+          .maybeSingle()
           .timeout(const Duration(seconds: 4));
-      final data = doc.data();
       if (data == null) return null;
       return {
         ...data,
@@ -116,25 +115,24 @@ class BarcodeService {
     String barcode,
   ) async {
     try {
-      final snapshot = await _firestore
-          .collection('b2b_inventory')
-          .where('barcode', isEqualTo: barcode)
+      final data = await _client
+          .from('b2b_inventory')
+          .select()
+          .eq('barcode', barcode)
           .limit(1)
-          .get()
+          .maybeSingle()
           .timeout(const Duration(seconds: 4));
-      if (snapshot.docs.isEmpty) return null;
+      if (data == null) return null;
 
-      final data = snapshot.docs.first.data();
       return {
         'name': _nonEmpty(data['name']),
         'category': _nonEmpty(data['category']),
         'manufacturer': _nonEmpty(data['manufacturer']),
         'brand': _nonEmpty(data['manufacturer']),
         'dosage': _nonEmpty(data['dosage']),
-        'packageSize': _nonEmpty(data['packageSize']),
-        'batchNumber': _nonEmpty(data['batchNumber']),
-        'expiryDate':
-            (data['expiryDate'] as Timestamp?)?.toDate().toIso8601String(),
+        'packageSize': _nonEmpty(data['package_size'] ?? data['packageSize']),
+        'batchNumber': _nonEmpty(data['batch_number'] ?? data['batchNumber']),
+        'expiryDate': data['expiry_date']?.toString(),
         'source': 'B2B inventory',
         'confidence': 0.92,
       };

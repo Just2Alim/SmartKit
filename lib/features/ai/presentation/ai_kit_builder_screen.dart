@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/router/app_routes.dart';
@@ -149,7 +149,7 @@ class _AiKitBuilderScreenState extends State<AiKitBuilderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
 
     return Scaffold(
       appBar: AppBar(title: const Text('AI сбор аптечки')),
@@ -162,7 +162,7 @@ class _AiKitBuilderScreenState extends State<AiKitBuilderScreen> {
                   initialData: const [],
                   builder: (context, catalogSnapshot) {
                     return StreamBuilder<List<MedicineModel>>(
-                      stream: _medicineRepository.getMedicinesByUser(user.uid),
+                      stream: _medicineRepository.getMedicinesByUser(user.id),
                       initialData: const [],
                       builder: (context, medicineSnapshot) {
                         final catalog = catalogSnapshot.data ?? [];

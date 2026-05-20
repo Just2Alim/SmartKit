@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class FamilyMemberModel {
   final String id;
   final String userId;
@@ -21,30 +19,29 @@ class FamilyMemberModel {
 
   Map<String, dynamic> toMap() {
     return {
-      'userId': userId,
+      'user_id': userId,
       'name': name,
       'relation': relation,
       'age': age,
       'notes': notes,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'created_at': createdAt.toIso8601String(),
     };
   }
 
-  factory FamilyMemberModel.fromDoc(
-    DocumentSnapshot<Map<String, dynamic>> doc,
-  ) {
-    final data = doc.data()!;
+  factory FamilyMemberModel.fromMap(Map<String, dynamic> data) {
+    DateTime parseDate(dynamic value) {
+      if (value is DateTime) return value;
+      return DateTime.tryParse(value?.toString() ?? '') ?? DateTime.now();
+    }
+
     return FamilyMemberModel(
-      id: doc.id,
-      userId: data['userId'] ?? '',
+      id: data['id'] ?? '',
+      userId: data['user_id'] ?? data['userId'] ?? '',
       name: data['name'] ?? '',
       relation: data['relation'] ?? '',
       age: data['age'] ?? 0,
       notes: data['notes'],
-      createdAt:
-          data['createdAt'] != null
-              ? (data['createdAt'] as Timestamp).toDate()
-              : DateTime.now(),
+      createdAt: parseDate(data['created_at'] ?? data['createdAt']),
     );
   }
 }

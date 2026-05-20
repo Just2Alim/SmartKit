@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -108,10 +108,10 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   }
 
   Future<void> _loadFamilyMembers() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
 
-    _familyRepository.getFamilyMembersByUser(user.uid).first.then((members) {
+    _familyRepository.getFamilyMembersByUser(user.id).first.then((members) {
       if (!mounted) return;
       setState(() {
         familyMembers = members;
@@ -309,7 +309,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   }
 
   Future<void> saveMedicine() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
 
     if (user == null) {
       ScaffoldMessenger.of(
@@ -340,7 +340,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     try {
       final medicine = MedicineModel(
         id: '',
-        userId: user.uid,
+        userId: user.id,
         familyMemberId: selectedOwner == 'me' ? null : selectedOwner,
         name: nameCtrl.text.trim(),
         dosage: dosageCtrl.text.trim(),

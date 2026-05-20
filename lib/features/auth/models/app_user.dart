@@ -1,5 +1,5 @@
 class AppUser {
-  final String uid;
+  final String id;
   final String email;
   final String role;
   final String? name;
@@ -9,7 +9,7 @@ class AppUser {
   final bool isDarkTheme;
 
   AppUser({
-    required this.uid,
+    required this.id,
     required this.email,
     required this.role,
     this.name,
@@ -20,7 +20,7 @@ class AppUser {
   });
 
   AppUser copyWith({
-    String? uid,
+    String? id,
     String? email,
     String? role,
     String? name,
@@ -30,7 +30,7 @@ class AppUser {
     bool? isDarkTheme,
   }) {
     return AppUser(
-      uid: uid ?? this.uid,
+      id: id ?? this.id,
       email: email ?? this.email,
       role: role ?? this.role,
       name: name ?? this.name,
@@ -43,27 +43,35 @@ class AppUser {
 
   Map<String, dynamic> toMap() {
     return {
-      'uid': uid,
+      'id': id,
+      'legacy_uid': id,
       'email': email,
       'role': role,
       'name': name,
+      'company_name': companyName,
       'companyName': companyName,
       'bin': bin,
+      'created_at': createdAt.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
+      'is_dark_theme': isDarkTheme,
       'isDarkTheme': isDarkTheme,
     };
   }
 
   factory AppUser.fromMap(Map<String, dynamic> map) {
     return AppUser(
-      uid: map['uid'] ?? '',
+      id: map['id'] ?? map['legacy_uid'] ?? map['uid'] ?? '',
       email: map['email'] ?? '',
       role: map['role'] ?? 'b2c',
       name: map['name'],
-      companyName: map['companyName'],
+      companyName: map['company_name'] ?? map['companyName'],
       bin: map['bin'],
-      createdAt: DateTime.tryParse(map['createdAt'] ?? '') ?? DateTime.now(),
-      isDarkTheme: map['isDarkTheme'] ?? false,
+      createdAt:
+          DateTime.tryParse(
+            (map['created_at'] ?? map['createdAt'] ?? '').toString(),
+          ) ??
+          DateTime.now(),
+      isDarkTheme: map['is_dark_theme'] ?? map['isDarkTheme'] ?? false,
     );
   }
 }

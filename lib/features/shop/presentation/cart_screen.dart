@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/state/cart_provider.dart';
 import '../../b2b/inventory/data/b2b_inventory_repository.dart';
 import '../../b2b/inventory/data/b2b_sales_repository.dart';
-import '../../b2b/inventory/models/b2b_sale_model.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -68,7 +67,8 @@ class _CartScreenState extends State<CartScreen> {
       final cartItems = CartProvider.instance.items;
       final inventoryRepo = B2BInventoryRepository();
       final salesRepo = B2BSalesRepository();
-      final customerId = FirebaseAuth.instance.currentUser?.uid ?? 'guest_user';
+      final customerId =
+          Supabase.instance.client.auth.currentUser?.id ?? 'guest_user';
       final salesByOwner = <String, List<Map<String, dynamic>>>{};
       final totalsByOwner = <String, int>{};
 
@@ -92,10 +92,10 @@ class _CartScreenState extends State<CartScreen> {
         final quantity = _quantityOf(item);
         if (item.containsKey('b2b_item')) {
           final itemId = item['id'] as String;
-          final soldItem = await inventoryRepo.decreaseStockForSale(
-            itemId,
-            quantity,
-          );
+          final soldItem = await inventoryRepo.getItemById(itemId);
+          if (soldItem == null) {
+            throw StateError('Товар "${item['title']}" больше недоступен');
+          }
 
           salesByOwner.putIfAbsent(soldItem.userId, () => []);
           salesByOwner[soldItem.userId]!.add({
@@ -121,16 +121,19 @@ class _CartScreenState extends State<CartScreen> {
       }
 
       for (final entry in salesByOwner.entries) {
-        final sale = B2BSaleModel(
-          id: '',
-          userId: entry.key,
-          items: entry.value,
-          totalAmount: totalsByOwner[entry.key] ?? 0,
-          saleDate: DateTime.now(),
-          customerId: customerId,
+        await salesRepo.recordShopCheckout(
+          organizationId: entry.key,
+          items:
+              entry.value
+                  .map(
+                    (item) => {
+                      'inventory_id': item['id'],
+                      'quantity': item['quantity'],
+                    },
+                  )
+                  .toList(),
           staffName: 'Онлайн-магазин',
         );
-        await salesRepo.recordSale(sale);
       }
 
       CartProvider.instance.clearCart();

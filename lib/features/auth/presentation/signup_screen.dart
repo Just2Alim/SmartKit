@@ -75,7 +75,7 @@ class _SignupScreenState extends State<SignupScreen> {
         isDarkTheme: ThemeProvider.instance.isDarkMode,
       );
 
-      await ThemeProvider.instance.reloadFromFirestore();
+      await ThemeProvider.instance.reloadFromSupabase();
 
       if (!mounted) return;
 
@@ -107,7 +107,9 @@ class _SignupScreenState extends State<SignupScreen> {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.7),
           ),
         ),
       ),
@@ -140,23 +142,24 @@ class _SignupScreenState extends State<SignupScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: isDark
-                ? [
-                    const Color(0xFF0F172A),
-                    const Color(0xFF1E293B),
-                    const Color(0xFF0F172A),
-                  ]
-                : isB2B
+            colors:
+                isDark
                     ? [
-                        const Color(0xFFF5F3FF),
-                        const Color(0xFFFFFFFF),
-                        const Color(0xFFF5F3FF),
-                      ]
+                      const Color(0xFF0F172A),
+                      const Color(0xFF1E293B),
+                      const Color(0xFF0F172A),
+                    ]
+                    : isB2B
+                    ? [
+                      const Color(0xFFF5F3FF),
+                      const Color(0xFFFFFFFF),
+                      const Color(0xFFF5F3FF),
+                    ]
                     : [
-                        const Color(0xFFF8FAFC),
-                        const Color(0xFFFFFFFF),
-                        const Color(0xFFF1F5F9),
-                      ],
+                      const Color(0xFFF8FAFC),
+                      const Color(0xFFFFFFFF),
+                      const Color(0xFFF1F5F9),
+                    ],
           ),
         ),
         child: SafeArea(
@@ -216,7 +219,9 @@ class _SignupScreenState extends State<SignupScreen> {
                       isB2B
                           ? 'Создайте бизнес-аккаунт'
                           : 'Создайте новый аккаунт',
-                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                      style: TextStyle(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                     const SizedBox(height: 28),
 

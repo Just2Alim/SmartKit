@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:smartkit/features/b2b/inventory/data/b2b_sales_repository.dart';
@@ -73,9 +73,10 @@ class B2BReportsScreen extends StatelessWidget {
     final result = <String, int>{};
     for (final item in items) {
       final raw = item.category.trim();
-      final category = raw.isEmpty
-          ? 'Прочее'
-          : raw[0].toUpperCase() + raw.substring(1).toLowerCase();
+      final category =
+          raw.isEmpty
+              ? 'Прочее'
+              : raw[0].toUpperCase() + raw.substring(1).toLowerCase();
       // Aggregating by product count instead of stock for better "visibility" of added items
       result[category] = (result[category] ?? 0) + 1;
     }
@@ -86,9 +87,10 @@ class B2BReportsScreen extends StatelessWidget {
     final result = <String, int>{};
     for (final item in items) {
       final raw = item.category.trim();
-      final category = raw.isEmpty
-          ? 'Прочее'
-          : raw[0].toUpperCase() + raw.substring(1).toLowerCase();
+      final category =
+          raw.isEmpty
+              ? 'Прочее'
+              : raw[0].toUpperCase() + raw.substring(1).toLowerCase();
       result[category] = (result[category] ?? 0) + item.stock;
     }
     return result;
@@ -100,7 +102,7 @@ class B2BReportsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
       return const Scaffold(
         body: Center(child: Text('Пользователь не найден')),
@@ -110,34 +112,59 @@ class B2BReportsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: StreamBuilder<List<B2BInventoryModel>>(
-        stream: _inventoryRepository.getItemsByUser(user.uid),
+        stream: _inventoryRepository.getItemsByUser(user.id),
         initialData: const [],
         builder: (context, inventorySnapshot) {
           if (inventorySnapshot.hasError) {
-            return Scaffold(body: Center(child: _errorCard('Ошибка загрузки склада: ${inventorySnapshot.error}')));
+            return Scaffold(
+              body: Center(
+                child: _errorCard(
+                  'Ошибка загрузки склада: ${inventorySnapshot.error}',
+                ),
+              ),
+            );
           }
           if (inventorySnapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(body: Center(child: CircularProgressIndicator()));
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
           }
 
           return StreamBuilder<List<B2BSaleModel>>(
-            stream: _salesRepository.getSalesByUser(user.uid),
+            stream: _salesRepository.getSalesByUser(user.id),
             builder: (context, salesSnapshot) {
               if (salesSnapshot.hasError) {
-                return Scaffold(body: Center(child: _errorCard('Ошибка загрузки продаж: ${salesSnapshot.error}')));
+                return Scaffold(
+                  body: Center(
+                    child: _errorCard(
+                      'Ошибка загрузки продаж: ${salesSnapshot.error}',
+                    ),
+                  ),
+                );
               }
               if (salesSnapshot.connectionState == ConnectionState.waiting) {
-                return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
               }
 
               return StreamBuilder<List<B2BLocationModel>>(
-                stream: _locationRepository.getLocationsByUser(user.uid),
+                stream: _locationRepository.getLocationsByUser(user.id),
                 builder: (context, locationsSnapshot) {
                   if (locationsSnapshot.hasError) {
-                    return Scaffold(body: Center(child: _errorCard('Ошибка загрузки локаций: ${locationsSnapshot.error}')));
+                    return Scaffold(
+                      body: Center(
+                        child: _errorCard(
+                          'Ошибка загрузки локаций: ${locationsSnapshot.error}',
+                        ),
+                      ),
+                    );
                   }
-                  if (locationsSnapshot.connectionState == ConnectionState.waiting) {
-                    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                  if (locationsSnapshot.connectionState ==
+                      ConnectionState.waiting) {
+                    return const Scaffold(
+                      body: Center(child: CircularProgressIndicator()),
+                    );
                   }
 
                   final inventory = inventorySnapshot.data ?? [];
@@ -148,7 +175,9 @@ class B2BReportsScreen extends StatelessWidget {
                   debugPrint('--- B2B REPORTS SYNC DEBUG ---');
                   debugPrint('Inventory snapshot: ${inventory.length} items');
                   if (inventory.isNotEmpty) {
-                    debugPrint('First item: ${inventory.first.name}, UID: ${inventory.first.userId}, Category: ${inventory.first.category}');
+                    debugPrint(
+                      'First item: ${inventory.first.name}, UID: ${inventory.first.userId}, Category: ${inventory.first.category}',
+                    );
                   }
                   debugPrint('Category Stats Map: $categoryStats');
                   debugPrint('------------------------------');
@@ -433,11 +462,11 @@ class B2BReportsScreen extends StatelessWidget {
         stats.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
     final maxValue = entries.isEmpty ? 1 : entries.first.value;
-    
-    // We already check for categoryStats.isEmpty before calling this, 
-    // and now categories are based on item count, so maxValue will be > 0 
+
+    // We already check for categoryStats.isEmpty before calling this,
+    // and now categories are based on item count, so maxValue will be > 0
     // if there are items.
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -452,97 +481,101 @@ class B2BReportsScreen extends StatelessWidget {
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(
-              alpha:
-                  Theme.of(context).brightness == Brightness.dark ? 0.22 : 0.05,
-            ),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
-      child: Column(
-        children:
-            entries.map((entry) {
-              final ratio = entry.value / maxValue;
-              final color = _getCategoryColor(entry.key);
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          entry.key,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
-                        Text(
-                          '${entry.value} поз.',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: color,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Stack(
-                      children: [
-                        Container(
-                          height: 12,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color:
-                                Theme.of(
-                                  context,
-                                ).colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                        ),
-                        FractionallySizedBox(
-                          widthFactor: ratio,
-                          child: Container(
-                            height: 12,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [color, color.withOpacity(0.7)],
-                              ),
-                              borderRadius: BorderRadius.circular(6),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: color.withOpacity(0.2),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(
+                  alpha:
+                      Theme.of(context).brightness == Brightness.dark
+                          ? 0.22
+                          : 0.05,
                 ),
-              );
-            }).toList(),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
+          child: Column(
+            children:
+                entries.map((entry) {
+                  final ratio = entry.value / maxValue;
+                  final color = _getCategoryColor(entry.key);
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              entry.key,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                            ),
+                            Text(
+                              '${entry.value} поз.',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: color,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Stack(
+                          children: [
+                            Container(
+                              height: 12,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color:
+                                    Theme.of(
+                                      context,
+                                    ).colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                            ),
+                            FractionallySizedBox(
+                              widthFactor: ratio,
+                              child: Container(
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [color, color.withOpacity(0.7)],
+                                  ),
+                                  borderRadius: BorderRadius.circular(6),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: color.withOpacity(0.2),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+          ),
         ),
-      ),
-    ],
-  );
-}
+      ],
+    );
+  }
 
   Color _getCategoryColor(String category) {
     final lower = category.toLowerCase();
@@ -780,15 +813,15 @@ class B2BReportsScreen extends StatelessWidget {
       ),
     );
   }
+
   Widget _buildRecentProducts(
     BuildContext context,
     List<B2BInventoryModel> items,
   ) {
     if (items.isEmpty) return const SizedBox.shrink();
 
-    final recentItems =
-        List<B2BInventoryModel>.from(items)
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final recentItems = List<B2BInventoryModel>.from(items)
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     final displayItems = recentItems.take(5).toList();
 
     return Column(
@@ -826,7 +859,10 @@ class B2BReportsScreen extends StatelessWidget {
               color: const Color(0xFF10B981).withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.medication_outlined, color: Color(0xFF10B981)),
+            child: const Icon(
+              Icons.medication_outlined,
+              color: Color(0xFF10B981),
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(

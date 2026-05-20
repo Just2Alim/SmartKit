@@ -48,6 +48,7 @@ app.*.map.json
 lib/core/constants/api_keys.dart
 lib/firebase_options.dart
 .env*
+!.env.example
 *.jks
 *.keystore
 *.key

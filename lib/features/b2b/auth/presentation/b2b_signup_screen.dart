@@ -1,8 +1,7 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/router/app_routes.dart';
+import '../../../auth/data/auth_repository.dart';
 
 class B2BSignupScreen extends StatefulWidget {
   const B2BSignupScreen({super.key});
@@ -17,6 +16,7 @@ class _B2BSignupScreenState extends State<B2BSignupScreen> {
   final emailCtrl = TextEditingController();
   final passwordCtrl = TextEditingController();
   final repeatPasswordCtrl = TextEditingController();
+  final _authRepository = AuthRepository();
 
   bool isLoading = false;
   bool obscurePassword = true;
@@ -38,16 +38,16 @@ class _B2BSignupScreenState extends State<B2BSignupScreen> {
         emailCtrl.text.trim().isEmpty ||
         passwordCtrl.text.trim().isEmpty ||
         repeatPasswordCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Заполните все поля')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Заполните все поля')));
       return;
     }
 
     if (passwordCtrl.text.trim() != repeatPasswordCtrl.text.trim()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Пароли не совпадают')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Пароли не совпадают')));
       return;
     }
 
@@ -61,35 +61,20 @@ class _B2BSignupScreenState extends State<B2BSignupScreen> {
     setState(() => isLoading = true);
 
     try {
-      final credential =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      await _authRepository.signUp(
         email: emailCtrl.text.trim(),
         password: passwordCtrl.text.trim(),
+        role: 'b2b',
+        name: companyCtrl.text.trim(),
+        companyName: companyCtrl.text.trim(),
+        bin: binCtrl.text.trim(),
       );
-
-      final user = credential.user;
-
-      if (user == null) {
-        throw Exception('Не удалось создать пользователя');
-      }
-
-      await user.updateDisplayName(companyCtrl.text.trim());
-
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'uid': user.uid,
-        'email': emailCtrl.text.trim(),
-        'role': 'b2b',
-        'companyName': companyCtrl.text.trim(),
-        'bin': binCtrl.text.trim(),
-        'createdAt': DateTime.now().toIso8601String(),
-        'isDarkTheme': false,
-      });
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('B2B аккаунт создан')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('B2B аккаунт создан')));
 
       Navigator.pushNamedAndRemoveUntil(
         context,
@@ -99,9 +84,9 @@ class _B2BSignupScreenState extends State<B2BSignupScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка регистрации: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Ошибка регистрации: $e')));
     } finally {
       if (mounted) {
         setState(() => isLoading = false);
@@ -127,9 +112,7 @@ class _B2BSignupScreenState extends State<B2BSignupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('B2B регистрация'),
-      ),
+      appBar: AppBar(title: const Text('B2B регистрация')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
@@ -165,10 +148,7 @@ class _B2BSignupScreenState extends State<B2BSignupScreen> {
               const Text(
                 'Укажите данные компании для бизнес-панели',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF6B7280),
-                ),
+                style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
               ),
               const SizedBox(height: 28),
 
@@ -184,10 +164,7 @@ class _B2BSignupScreenState extends State<B2BSignupScreen> {
               ),
               const SizedBox(height: 16),
 
-              Align(
-                alignment: Alignment.centerLeft,
-                child: _label('БИН'),
-              ),
+              Align(alignment: Alignment.centerLeft, child: _label('БИН')),
               TextField(
                 controller: binCtrl,
                 keyboardType: TextInputType.number,
@@ -197,10 +174,7 @@ class _B2BSignupScreenState extends State<B2BSignupScreen> {
               ),
               const SizedBox(height: 16),
 
-              Align(
-                alignment: Alignment.centerLeft,
-                child: _label('Email'),
-              ),
+              Align(alignment: Alignment.centerLeft, child: _label('Email')),
               TextField(
                 controller: emailCtrl,
                 keyboardType: TextInputType.emailAddress,
@@ -210,10 +184,7 @@ class _B2BSignupScreenState extends State<B2BSignupScreen> {
               ),
               const SizedBox(height: 16),
 
-              Align(
-                alignment: Alignment.centerLeft,
-                child: _label('Пароль'),
-              ),
+              Align(alignment: Alignment.centerLeft, child: _label('Пароль')),
               TextField(
                 controller: passwordCtrl,
                 obscureText: obscurePassword,
@@ -265,22 +236,23 @@ class _B2BSignupScreenState extends State<B2BSignupScreen> {
                 height: 54,
                 child: ElevatedButton(
                   onPressed: isLoading ? null : _signup,
-                  child: isLoading
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+                  child:
+                      isLoading
+                          ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                          : const Text(
+                            'Зарегистрироваться',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
-                        )
-                      : const Text(
-                          'Зарегистрироваться',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
                 ),
               ),
 

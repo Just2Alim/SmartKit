@@ -3,7 +3,7 @@
 ![SmartKit Banner](assets/readme/smartkit_readme_banner_1777584784757.jpg)
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.22.0+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
-[![Firebase](https://img.shields.io/badge/Firebase-Auth%20%7C%20Firestore-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL%20%7C%20Auth-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
 [![Ollama AI](https://img.shields.io/badge/AI-Local%20Ollama-FC6404?style=for-the-badge&logo=ollama&logoColor=white)](https://ollama.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
@@ -46,8 +46,8 @@
 ## 🛠 Tech Stack
 
 - **Frontend**: [Flutter](https://flutter.dev) (Dart)
-- **Backend**: [Firebase](https://firebase.google.com) (Authentication, Cloud Firestore)
-- **Local AI**: [Ollama](https://ollama.com) (Llama 3)
+- **Backend**: [Supabase](https://supabase.com) (PostgreSQL, Auth, RLS, Edge Functions)
+- **AI**: Server-side Ollama/Qwen3 gateway
 - **Scanning**: [mobile_scanner](https://pub.dev/packages/mobile_scanner) & MLKit OCR
 - **State Management**: Provider
 
@@ -57,8 +57,8 @@
 
 ### Prerequisites
 - Flutter SDK (latest stable version)
-- A Firebase project
-- A Gemini API Key from [Google AI Studio](https://aistudio.google.com/)
+- A Supabase project
+- Hosted Ollama/Qwen3 or another LLM endpoint for Edge Functions
 
 ### Installation
 
@@ -73,20 +73,37 @@
    flutter pub get
    ```
 
-3. **Configure Environment Variables**:
-   Create a file `lib/core/constants/api_keys.dart` based on the example:
-   ```dart
-   // lib/core/constants/api_keys.dart
-   class ApiKeys {
-     static const String geminiApiKey = 'YOUR_GEMINI_API_KEY';
-     static const String firebaseWebApiKey = 'YOUR_FIREBASE_WEB_API_KEY';
-   }
-   ```
+3. **Configure backend variables**:
+   Use `.env.example` as the template, create a local `.env`, and pass values
+   with `--dart-define-from-file=.env`.
 
 4. **Run the application**:
    ```bash
-   flutter run
+   flutter run -d chrome --dart-define-from-file=.env
    ```
+
+### Docker Deployment
+
+SmartKit can be served as a web release with Qwen3 through Docker Compose:
+
+```bash
+docker compose --env-file .env up --build
+```
+
+The web app is served on `http://localhost:8080`, and Ollama pulls
+`qwen3:latest` by default. This is intentionally the full Qwen3 tag for better
+answers, even if generation is slower on a laptop.
+
+If Supabase Edge Functions must call a private Ollama host, expose
+`scripts/ollama_proxy.mjs` behind your domain or tunnel and set Supabase
+secrets:
+
+```bash
+supabase secrets set \
+  OLLAMA_BASE_URL=https://your-ollama-proxy.example.com \
+  OLLAMA_MODEL=qwen3:latest \
+  OLLAMA_API_KEY=$OLLAMA_PROXY_TOKEN
+```
 
 ---
 
@@ -95,7 +112,7 @@
 ```text
 lib/
 ├── core/               # App configuration, themes, constants, and services
-│   ├── services/       # AI (Gemini/Ollama), Auth, Barcode, etc.
+│   ├── services/       # AI, Auth, Barcode, etc.
 │   └── theme/          # Premium design system tokens
 ├── features/           # Feature-based architecture
 │   ├── ai/             # AI Chat and Kit Builder logic

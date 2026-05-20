@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class B2BInventoryModel {
   final String id;
   final String userId;
@@ -89,54 +87,56 @@ class B2BInventoryModel {
 
   Map<String, dynamic> toMap() {
     return {
-      'userId': userId,
+      'organization_id': userId,
       'name': name,
       'category': category,
       'description': description,
       'manufacturer': manufacturer,
       'barcode': barcode,
-      'batchNumber': batchNumber,
+      'batch_number': batchNumber,
       'dosage': dosage,
-      'packageSize': packageSize,
+      'package_size': packageSize,
       'stock': stock,
-      'minStock': minStock,
+      'min_stock': minStock,
       'price': price,
-      'locationId': locationId,
-      'expiryDate': expiryDate != null ? Timestamp.fromDate(expiryDate!) : null,
-      'createdAt': Timestamp.fromDate(createdAt),
-      'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
+      'location_id': locationId,
+      'expiry_date': expiryDate?.toIso8601String(),
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt?.toIso8601String(),
     };
   }
 
-  factory B2BInventoryModel.fromDoc(
-    DocumentSnapshot<Map<String, dynamic>> doc,
-  ) {
-    final data = doc.data()!;
+  factory B2BInventoryModel.fromMap(Map<String, dynamic> data) {
     DateTime? timestampToDate(dynamic value) {
       if (value == null) return null;
-      if (value is Timestamp) return value.toDate();
+      if (value is DateTime) return value;
       if (value is String) return DateTime.tryParse(value);
       return null;
     }
 
     return B2BInventoryModel(
-      id: doc.id,
-      userId: data['userId'] ?? '',
+      id: data['id'] ?? '',
+      userId: data['organization_id'] ?? data['userId'] ?? '',
       name: data['name'] ?? '',
       category: data['category'] ?? '',
       description: data['description'],
       manufacturer: data['manufacturer'] ?? data['brand'],
       barcode: data['barcode'],
-      batchNumber: data['batchNumber'],
+      batchNumber: data['batch_number'] ?? data['batchNumber'],
       dosage: data['dosage'],
-      packageSize: data['packageSize'],
+      packageSize: data['package_size'] ?? data['packageSize'],
       stock: (data['stock'] as num?)?.toInt() ?? 0,
-      minStock: (data['minStock'] as num?)?.toInt() ?? 0,
+      minStock:
+          (data['min_stock'] as num?)?.toInt() ??
+          (data['minStock'] as num?)?.toInt() ??
+          0,
       price: (data['price'] as num?)?.toInt() ?? 0,
-      locationId: data['locationId'],
-      expiryDate: timestampToDate(data['expiryDate']),
-      createdAt: timestampToDate(data['createdAt']) ?? DateTime.now(),
-      updatedAt: timestampToDate(data['updatedAt']),
+      locationId: data['location_id'] ?? data['locationId'],
+      expiryDate: timestampToDate(data['expiry_date'] ?? data['expiryDate']),
+      createdAt:
+          timestampToDate(data['created_at'] ?? data['createdAt']) ??
+          DateTime.now(),
+      updatedAt: timestampToDate(data['updated_at'] ?? data['updatedAt']),
     );
   }
 }

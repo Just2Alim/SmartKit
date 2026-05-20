@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../features/auth/data/auth_repository.dart';
 import '../router/app_routes.dart';
-import 'firebase_auth_service.dart';
+import 'supabase_auth_service.dart';
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final authService = FirebaseAuthService();
+    final authService = SupabaseAuthService();
     final authRepository = AuthRepository();
 
     return StreamBuilder(
@@ -18,9 +18,9 @@ class AuthGate extends StatelessWidget {
           return const _SplashLoadingScreen();
         }
 
-        final firebaseUser = snapshot.data;
+        final user = snapshot.data;
 
-        if (firebaseUser == null) {
+        if (user == null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
           });

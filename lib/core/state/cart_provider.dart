@@ -36,10 +36,7 @@ class CartProvider extends ChangeNotifier {
         if (type == 'Color') {
           result[key] = Color(value['value']);
         } else if (type == 'IconData') {
-          result[key] = IconData(
-            value['codePoint'],
-            fontFamily: 'MaterialIcons',
-          );
+          result[key] = _iconFromCodePoint((value['codePoint'] as num).toInt());
         } else if (type == 'DateTime') {
           result[key] = DateTime.parse(value['value']);
         } else {
@@ -52,6 +49,26 @@ class CartProvider extends ChangeNotifier {
       }
     });
     return result;
+  }
+
+  IconData _iconFromCodePoint(int codePoint) {
+    const supportedIcons = <IconData>[
+      Icons.bolt_rounded,
+      Icons.sanitizer_rounded,
+      Icons.air_rounded,
+      Icons.spa_rounded,
+      Icons.favorite_rounded,
+      Icons.record_voice_over_rounded,
+      Icons.medication_rounded,
+      Icons.medical_services_rounded,
+      Icons.local_pharmacy_rounded,
+      Icons.healing_rounded,
+    ];
+
+    return supportedIcons.firstWhere(
+      (icon) => icon.codePoint == codePoint,
+      orElse: () => Icons.medication_rounded,
+    );
   }
 
   Future<void> _saveCart() async {

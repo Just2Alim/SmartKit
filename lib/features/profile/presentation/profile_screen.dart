@@ -1,8 +1,7 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/router/app_routes.dart';
-
 
 import '../../auth/data/auth_repository.dart';
 import '../../auth/models/app_user.dart';
@@ -35,19 +34,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
     final email = user?.email ?? 'Нет email';
     final name = _appUser?.name ?? 'Пользователь SmartKit';
 
     return Scaffold(
-
       appBar: AppBar(
         title: const Text('Профиль'),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_rounded),
             onPressed: () async {
-              final result = await Navigator.pushNamed(context, AppRoutes.editProfile);
+              final result = await Navigator.pushNamed(
+                context,
+                AppRoutes.editProfile,
+              );
               if (result == true) {
                 _loadUser();
               }

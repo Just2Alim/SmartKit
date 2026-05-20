@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../data/b2b_sales_repository.dart';
@@ -9,7 +9,7 @@ class B2BSalesHistoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
     final salesRepository = B2BSalesRepository();
 
     return Scaffold(
@@ -18,7 +18,7 @@ class B2BSalesHistoryScreen extends StatelessWidget {
           user == null
               ? const Center(child: Text('Пользователь не найден'))
               : StreamBuilder<List<B2BSaleModel>>(
-                stream: salesRepository.getSalesByUser(user.uid),
+                stream: salesRepository.getSalesByUser(user.id),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(

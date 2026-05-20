@@ -1,0 +1,65 @@
+services:
+  smartkit-web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        SUPABASE_URL: ${SUPABASE_URL}
+        SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+        SMARTKIT_API_BASE_URL: ${SMARTKIT_API_BASE_URL}
+        OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:latest}
+    ports:
+      - "${SMARTKIT_WEB_PORT:-8080}:80"
+    depends_on:
+      ollama-pull:
+        condition: service_completed_successfully
+      ollama-proxy:
+        condition: service_started
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    environment:
+      OLLAMA_HOST: 0.0.0.0
+      OLLAMA_ORIGINS: "*"
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      - ollama
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:latest}
+    entrypoint: /bin/sh
+    command: >
+      -lc 'until ollama list >/dev/null 2>&1; do sleep 2; done;
+      ollama pull "$$OLLAMA_MODEL"'
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: "no"
+
+  ollama-proxy:
+    image: node:25-alpine
+    working_dir: /app
+    command: node scripts/ollama_proxy.mjs
+    ports:
+      - "${OLLAMA_PROXY_PORT:-11500}:11500"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 11500
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_PROXY_TOKEN: ${OLLAMA_PROXY_TOKEN:-}
+    volumes:
+      - ./scripts:/app/scripts:ro
+    depends_on:
+      ollama-pull:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  ollama-data:

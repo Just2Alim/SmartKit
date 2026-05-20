@@ -1,24 +1,24 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../models/medicine_model.dart';
 
 class MedicineRepository {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  CollectionReference<Map<String, dynamic>> get _medicinesCollection =>
-      _firestore.collection('medicines');
+  SupabaseClient get _client => Supabase.instance.client;
 
   Future<void> addMedicine(MedicineModel medicine) async {
-    await _medicinesCollection.add(medicine.toMap());
+    await _client.from('medicines').insert(medicine.toMap());
   }
 
   Stream<List<MedicineModel>> getMedicinesByUser(String userId) {
-    return _medicinesCollection
-        .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
+    return _client
+        .from('medicines')
+        .stream(primaryKey: ['id'])
+        .eq('user_id', userId)
+        .order('created_at', ascending: false)
         .map(
-          (snapshot) =>
-              snapshot.docs.map((doc) => MedicineModel.fromDoc(doc)).toList(),
+          (rows) =>
+              rows.map((row) => MedicineModel.fromMap(row)).toList()
+                ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
         );
   }
 
@@ -26,25 +26,30 @@ class MedicineRepository {
     required String userId,
     required String familyMemberId,
   }) {
-    return _medicinesCollection
-        .where('userId', isEqualTo: userId)
-        .where('familyMemberId', isEqualTo: familyMemberId)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
+    return _client
+        .from('medicines')
+        .stream(primaryKey: ['id'])
+        .eq('user_id', userId)
+        .order('created_at', ascending: false)
         .map(
-          (snapshot) =>
-              snapshot.docs.map((doc) => MedicineModel.fromDoc(doc)).toList(),
+          (rows) =>
+              rows
+                  .where((row) => row['family_member_id'] == familyMemberId)
+                  .map((row) => MedicineModel.fromMap(row))
+                  .toList()
+                ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
         );
   }
 
   Future<MedicineModel?> getMedicineById(String medicineId) async {
-    final doc = await _medicinesCollection.doc(medicineId).get();
-
-    if (!doc.exists || doc.data() == null) {
-      return null;
-    }
-
-    return MedicineModel.fromDoc(doc);
+    final data =
+        await _client
+            .from('medicines')
+            .select()
+            .eq('id', medicineId)
+            .maybeSingle();
+    if (data == null) return null;
+    return MedicineModel.fromMap(Map<String, dynamic>.from(data));
   }
 
   Future<void> updateMedicine({
@@ -68,21 +73,21 @@ class MedicineRepository {
       'quantity': quantity,
       'category': category,
       'notes': notes,
-      'familyMemberId': familyMemberId,
-      'expiryDate': expiryDate != null ? Timestamp.fromDate(expiryDate) : null,
+      'family_member_id': familyMemberId,
+      'expiry_date': expiryDate?.toIso8601String(),
     };
 
     if (barcode != null) updates['barcode'] = barcode;
     if (manufacturer != null) updates['manufacturer'] = manufacturer;
-    if (packageSize != null) updates['packageSize'] = packageSize;
-    if (batchNumber != null) updates['batchNumber'] = batchNumber;
-    if (scanSource != null) updates['scanSource'] = scanSource;
+    if (packageSize != null) updates['package_size'] = packageSize;
+    if (batchNumber != null) updates['batch_number'] = batchNumber;
+    if (scanSource != null) updates['scan_source'] = scanSource;
 
-    await _medicinesCollection.doc(medicineId).update(updates);
+    await _client.from('medicines').update(updates).eq('id', medicineId);
   }
 
   Future<void> deleteMedicine(String medicineId) async {
-    await _medicinesCollection.doc(medicineId).delete();
+    await _client.from('medicines').delete().eq('id', medicineId);
   }
 
   Stream<List<MedicineModel>> getExpiringMedicines({

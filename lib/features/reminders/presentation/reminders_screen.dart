@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/router/app_routes.dart';
@@ -13,10 +13,9 @@ class RemindersScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
 
     return Scaffold(
-
       appBar: AppBar(title: const Text('Напоминания')),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
@@ -28,7 +27,7 @@ class RemindersScreen extends StatelessWidget {
           user == null
               ? const Center(child: Text('Пользователь не найден'))
               : StreamBuilder<List<ReminderModel>>(
-                stream: _repository.getRemindersByUser(user.uid),
+                stream: _repository.getRemindersByUser(user.id),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
@@ -78,16 +77,22 @@ class RemindersScreen extends StatelessWidget {
                               width: 54,
                               height: 54,
                               decoration: BoxDecoration(
-                                color: Theme.of(context).brightness == Brightness.dark
-                                    ? const Color(0xFF4C1D95).withOpacity(0.3)
-                                    : const Color(0xFFEDE9FE),
+                                color:
+                                    Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? const Color(
+                                          0xFF4C1D95,
+                                        ).withOpacity(0.3)
+                                        : const Color(0xFFEDE9FE),
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Icon(
                                 Icons.alarm_rounded,
-                                color: Theme.of(context).brightness == Brightness.dark
-                                    ? const Color(0xFFA78BFA)
-                                    : const Color(0xFF7C3AED),
+                                color:
+                                    Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? const Color(0xFFA78BFA)
+                                        : const Color(0xFF7C3AED),
                               ),
                             ),
                             const SizedBox(width: 14),
@@ -100,7 +105,10 @@ class RemindersScreen extends StatelessWidget {
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w800,
-                                      color: Theme.of(context).colorScheme.onSurface,
+                                      color:
+                                          Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface,
                                     ),
                                   ),
                                   const SizedBox(height: 4),
@@ -108,7 +116,10 @@ class RemindersScreen extends StatelessWidget {
                                     '${reminder.time} • ${reminder.isDaily ? 'Каждый день' : 'По дням'}',
                                     style: TextStyle(
                                       fontSize: 13,
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      color:
+                                          Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                 ],

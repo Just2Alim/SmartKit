@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/medicine/models/medicine_model.dart';
+import '../api/smartkit_api_client.dart';
 import 'ai_service_interface.dart';
 import 'ai_safety.dart';
 
@@ -19,7 +21,10 @@ class OllamaService implements AiService {
     'http://127.0.0.1:11434/api/chat',
     'http://10.0.2.2:11434/api/chat',
   ];
-  static const String _model = 'llama3';
+  static const String _model = String.fromEnvironment(
+    'OLLAMA_MODEL',
+    defaultValue: 'qwen3:latest',
+  );
 
   @override
   void initWithMedicines(List<MedicineModel> medicines) {
@@ -53,6 +58,16 @@ class OllamaService implements AiService {
 
       debugPrint('Ollama Request: $text');
 
+      final backendResponse = await _sendViaBackend();
+      if (backendResponse != null && backendResponse.trim().isNotEmpty) {
+        var safeResponse = _appendSafetyIfNeeded(backendResponse.trim(), text);
+        if (AiSafety.appearsToUseDifferentLanguage(safeResponse, text)) {
+          safeResponse = _languageSafeFallback(text);
+        }
+        _history.add({'role': 'assistant', 'content': safeResponse});
+        return safeResponse;
+      }
+
       for (final endpoint in _candidateBaseUrls) {
         try {
           final response = await http.post(
@@ -62,7 +77,12 @@ class OllamaService implements AiService {
               'model': _model,
               'messages': _history,
               'stream': false,
-              'options': {'temperature': 0.35, 'top_p': 0.85},
+              'options': {
+                'temperature': 0.35,
+                'top_p': 0.85,
+                'num_ctx': 8192,
+                'num_predict': 4096,
+              },
             }),
           );
 
@@ -135,7 +155,12 @@ class OllamaService implements AiService {
             },
           ],
           'stream': false,
-          'options': {'temperature': 0.1, 'top_p': 0.8},
+          'options': {
+            'temperature': 0.1,
+            'top_p': 0.8,
+            'num_ctx': 8192,
+            'num_predict': 2048,
+          },
         }),
       );
 
@@ -144,6 +169,22 @@ class OllamaService implements AiService {
       return data['message']['content'] as String?;
     } catch (error) {
       debugPrint('Ollama language repair failed: $error');
+      return null;
+    }
+  }
+
+  Future<String?> _sendViaBackend() async {
+    try {
+      final accessToken =
+          Supabase.instance.client.auth.currentSession?.accessToken;
+      final response = await SmartKitApiClient().postJson(
+        'ai-chat',
+        accessToken: accessToken,
+        body: {'messages': _history},
+      );
+      return response['message']?.toString();
+    } catch (error) {
+      debugPrint('SmartKit AI gateway unavailable: $error');
       return null;
     }
   }

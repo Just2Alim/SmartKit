@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -57,9 +57,9 @@ class _AiChatScreenState extends State<AiChatScreen>
   }
 
   Future<void> _loadMedicinesAndInit() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
     if (user != null) {
-      medicines = await _medicineRepository.getMedicinesByUser(user.uid).first;
+      medicines = await _medicineRepository.getMedicinesByUser(user.id).first;
     }
 
     _aiService = await AiProvider.getService();
