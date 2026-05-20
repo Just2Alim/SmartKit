@@ -12,6 +12,7 @@ import '../../medicine/data/medicine_repository.dart';
 import '../../medicine/models/medicine_model.dart';
 import '../../shop/utils/shop_product_mapper.dart';
 import '../domain/ai_kit_planner.dart';
+import '../models/ai_chat_result.dart';
 
 class AiChatScreen extends StatefulWidget {
   final String? mode;
@@ -33,6 +34,7 @@ class _AiChatScreenState extends State<AiChatScreen>
   bool isLoadingMedicines = true;
   bool isAiTyping = false;
   AiService? _aiService;
+  String? _threadId;
 
   final List<_ChatMessage> messages = [];
 
@@ -67,10 +69,81 @@ class _AiChatScreenState extends State<AiChatScreen>
     // Инициализируем AI сервис с контекстом аптечки
     _aiService?.initWithMedicines(medicines);
 
-    _addInitialMessage();
+    final restored = await _restoreLatestChat();
+    if (!restored) {
+      _addInitialMessage();
+    }
 
     if (mounted) {
       setState(() => isLoadingMedicines = false);
+    }
+  }
+
+  Future<bool> _restoreLatestChat() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return false;
+
+    try {
+      final client = Supabase.instance.client;
+      final threadRows = await client
+          .from('chat_threads')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('scope', 'consumer')
+          .order('last_message_at', ascending: false)
+          .order('created_at', ascending: false)
+          .limit(1);
+
+      if (threadRows.isEmpty) return false;
+      _threadId = threadRows.first['id']?.toString();
+      if (_threadId == null || _threadId!.isEmpty) return false;
+
+      final rows = await client
+          .from('chat_messages')
+          .select('role, content, metadata, created_at')
+          .eq('thread_id', _threadId!)
+          .order('created_at', ascending: true)
+          .limit(80);
+
+      if (rows.isEmpty) return false;
+      messages.clear();
+      for (final row in rows) {
+        final role = row['role']?.toString() ?? 'assistant';
+        final metadata = Map<String, dynamic>.from(
+          (row['metadata'] as Map?) ?? const <String, dynamic>{},
+        );
+        final suggestions =
+            (metadata['productSuggestions'] as List? ?? const [])
+                .whereType<Map>()
+                .map(
+                  (item) => AiProductSuggestion.fromMap(
+                    Map<String, dynamic>.from(item),
+                  ),
+                )
+                .toList();
+        final sources =
+            (metadata['sources'] as List? ?? const [])
+                .whereType<Map>()
+                .map(
+                  (item) => AiSourceReference.fromMap(
+                    Map<String, dynamic>.from(item),
+                  ),
+                )
+                .toList();
+        messages.add(
+          _ChatMessage(
+            text: row['content']?.toString() ?? '',
+            isUser: role == 'user',
+            productSuggestions: suggestions,
+            sources: sources,
+            timestamp: DateTime.tryParse(row['created_at']?.toString() ?? ''),
+          ),
+        );
+      }
+      return messages.isNotEmpty;
+    } catch (error) {
+      debugPrint('SmartKit AI chat restore failed: $error');
+      return false;
     }
   }
 
@@ -87,7 +160,7 @@ class _AiChatScreenState extends State<AiChatScreen>
         break;
       default:
         text =
-            'Привет! Я SmartKit AI 🤖 — твой умный помощник по домашней аптечке.\n\nМогу:\n• Проверить аптечку и сроки\n• Подсказать безопасные следующие шаги при симптомах\n• Собрать базовый набор и создать корзину после подтверждения\n• Ответить на вопросы о хранении лекарств\n\nЧем могу помочь?';
+            'Привет! Я SmartKit AI 🤖 — помощник по аптечке, аптечному каталогу и безопасным справочным рекомендациям.\n\nМогу:\n• Проверить аптечку и сроки\n• Объяснить общие варианты безрецептурных средств\n• Подобрать товары из каталога и показать карточки для корзины\n• Сохранить контекст чата между входами\n\nЧем могу помочь?';
     }
     messages.add(_ChatMessage(text: text, isUser: false));
   }
@@ -106,6 +179,8 @@ class _AiChatScreenState extends State<AiChatScreen>
 
     String response;
     AiKitPlan? kitPlan;
+    List<AiProductSuggestion> productSuggestions = const [];
+    List<AiSourceReference> sources = const [];
 
     if (AiKitPlanner.hasKitIntent(text)) {
       final catalog = await _loadCatalogForKit();
@@ -116,21 +191,87 @@ class _AiChatScreenState extends State<AiChatScreen>
         homeMedicines: medicines,
       );
       response = AiKitPlanner.chatSummary(kitPlan, userText: text);
+      await _persistLocalExchange(text, response);
     } else {
-      response =
-          await (_aiService?.sendMessage(text) ??
-              Future.value('Ошибка: AI сервис не инициализирован'));
+      final result =
+          await (_aiService?.sendRichMessage(text, threadId: _threadId) ??
+              Future.value(
+                const AiChatResult(
+                  message: 'Ошибка: AI сервис не инициализирован',
+                ),
+              ));
+      _threadId = result.threadId ?? _threadId;
+      response = result.message;
+      productSuggestions = result.productSuggestions;
+      sources = result.sources;
     }
 
     if (mounted) {
       setState(() {
         messages.add(
-          _ChatMessage(text: response, isUser: false, kitPlan: kitPlan),
+          _ChatMessage(
+            text: response,
+            isUser: false,
+            kitPlan: kitPlan,
+            productSuggestions: productSuggestions,
+            sources: sources,
+          ),
         );
         isAiTyping = false;
       });
       Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
     }
+  }
+
+  Future<void> _persistLocalExchange(String userText, String aiText) async {
+    try {
+      final threadId = await _ensureThread(userText);
+      if (threadId == null) return;
+      final now = DateTime.now().toIso8601String();
+      await Supabase.instance.client.from('chat_messages').insert([
+        {
+          'thread_id': threadId,
+          'role': 'user',
+          'content': userText,
+          'metadata': {'scope': 'consumer', 'localPlanner': true},
+        },
+        {
+          'thread_id': threadId,
+          'role': 'assistant',
+          'content': aiText,
+          'metadata': {'scope': 'consumer', 'localPlanner': true},
+        },
+      ]);
+      await Supabase.instance.client
+          .from('chat_threads')
+          .update({'last_message_at': now, 'updated_at': now})
+          .eq('id', threadId);
+    } catch (error) {
+      debugPrint('SmartKit local AI chat persist failed: $error');
+    }
+  }
+
+  Future<String?> _ensureThread(String titleSource) async {
+    if (_threadId != null && _threadId!.trim().isNotEmpty) return _threadId;
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return null;
+    final title =
+        titleSource.length > 60
+            ? '${titleSource.substring(0, 60)}...'
+            : titleSource;
+    final row =
+        await Supabase.instance.client
+            .from('chat_threads')
+            .insert({
+              'user_id': user.id,
+              'scope': 'consumer',
+              'title': title,
+              'last_message_at': DateTime.now().toIso8601String(),
+            })
+            .select('id')
+            .single();
+    _threadId = row['id']?.toString();
+    return _threadId;
   }
 
   Future<List<B2BInventoryModel>> _loadCatalogForKit() async {
@@ -229,6 +370,7 @@ class _AiChatScreenState extends State<AiChatScreen>
     setState(() {
       messages.clear();
       isAiTyping = false;
+      _threadId = null;
     });
     _aiService?.resetChat(medicines);
     _addInitialMessage();
@@ -377,6 +519,9 @@ class _AiChatScreenState extends State<AiChatScreen>
           );
         },
         child: Container(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width - 72,
+          ),
           margin: EdgeInsets.only(
             bottom: 10,
             left: isUser ? 60 : 0,
@@ -446,10 +591,173 @@ class _AiChatScreenState extends State<AiChatScreen>
                   ),
                 ),
               ],
+              if (!isUser && message.productSuggestions.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _buildProductSuggestions(message.productSuggestions, isDark),
+              ],
+              if (!isUser && message.sources.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                _buildSourceChips(message.sources, isDark),
+              ],
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildProductSuggestions(
+    List<AiProductSuggestion> suggestions,
+    bool isDark,
+  ) {
+    return Column(
+      children:
+          suggestions.map((product) {
+            final color = ShopProductMapper.categoryColor(product.category);
+            final inCart = _quantityInCart(product.id);
+            final canAdd = product.stock > inCart;
+            return Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color:
+                    isDark ? const Color(0xFF111827) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color:
+                      isDark
+                          ? const Color(0xFF374151)
+                          : const Color(0xFFE5E7EB),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      ShopProductMapper.categoryIcon(product.category),
+                      color: color,
+                      size: 21,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          product.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w800,
+                            color:
+                                isDark
+                                    ? const Color(0xFFF9FAFB)
+                                    : const Color(0xFF111827),
+                          ),
+                        ),
+                        if (product.subtitle.trim().isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            product.subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 4),
+                        Text(
+                          '${product.price} • остаток ${product.stock}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: color,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    tooltip: canAdd ? 'Добавить в корзину' : 'Недоступно',
+                    style: IconButton.styleFrom(
+                      backgroundColor: canAdd ? color : const Color(0xFF9CA3AF),
+                      foregroundColor: Colors.white,
+                      fixedSize: const Size(38, 38),
+                    ),
+                    onPressed:
+                        canAdd ? () => _addSuggestedProduct(product) : null,
+                    icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+    );
+  }
+
+  Widget _buildSourceChips(List<AiSourceReference> sources, bool isDark) {
+    final visible = sources.take(3).toList();
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children:
+          visible.map((source) {
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              decoration: BoxDecoration(
+                color:
+                    isDark ? const Color(0xFF111827) : const Color(0xFFF3F4F6),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color:
+                      isDark
+                          ? const Color(0xFF374151)
+                          : const Color(0xFFE5E7EB),
+                ),
+              ),
+              child: Text(
+                source.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF6B7280),
+                ),
+              ),
+            );
+          }).toList(),
+    );
+  }
+
+  void _addSuggestedProduct(AiProductSuggestion product) {
+    final inCart = _quantityInCart(product.id);
+    if (inCart >= product.stock) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Доступный остаток уже в корзине')),
+      );
+      return;
+    }
+
+    final map = product.toCartProduct();
+    map['source'] = 'ai_chat_suggestion';
+    CartProvider.instance.addItem(map);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${product.title} добавлен в корзину')),
     );
   }
 
@@ -655,8 +963,16 @@ class _ChatMessage {
   final String text;
   final bool isUser;
   final AiKitPlan? kitPlan;
+  final List<AiProductSuggestion> productSuggestions;
+  final List<AiSourceReference> sources;
   final DateTime timestamp;
 
-  _ChatMessage({required this.text, required this.isUser, this.kitPlan})
-    : timestamp = DateTime.now();
+  _ChatMessage({
+    required this.text,
+    required this.isUser,
+    this.kitPlan,
+    this.productSuggestions = const [],
+    this.sources = const [],
+    DateTime? timestamp,
+  }) : timestamp = timestamp ?? DateTime.now();
 }

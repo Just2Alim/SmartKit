@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SmartKit Admin</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./config.local.js"></script>
+    <script
+      src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"
+      defer
+    ></script>
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">SK</div>
+        <div>
+          <strong>SmartKit Admin</strong>
+          <span>AI monitoring</span>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="#overview" class="active"
+          ><i data-lucide="layout-dashboard"></i> Обзор</a
+        >
+        <a href="#ai"><i data-lucide="bot"></i> AI ответы</a>
+        <a href="#users"><i data-lucide="users"></i> Пользователи</a>
+        <a href="#commerce"><i data-lucide="shopping-cart"></i> Каталог</a>
+      </nav>
+      <button id="refreshButton" class="ghost-button" type="button">
+        <i data-lucide="refresh-cw"></i>
+        Обновить
+      </button>
+    </aside>
+
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Отдельная web-панель</p>
+          <h1>Мониторинг SmartKit</h1>
+        </div>
+        <div class="top-actions">
+          <span id="statusBadge" class="status">Не подключено</span>
+          <button id="logoutButton" class="ghost-button hidden" type="button">
+            <i data-lucide="log-out"></i>
+            Выйти
+          </button>
+        </div>
+      </header>
+
+      <section id="setupPanel" class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Подключение</p>
+            <h2>Вход администратора</h2>
+          </div>
+          <i data-lucide="shield-check"></i>
+        </div>
+        <form id="loginForm" class="setup-grid">
+          <label>
+            Supabase URL
+            <input
+              id="supabaseUrl"
+              type="url"
+              placeholder="https://project.supabase.co"
+              required
+            />
+          </label>
+          <label>
+            Supabase anon key
+            <input
+              id="supabaseAnon"
+              type="password"
+              placeholder="eyJ..."
+              required
+            />
+          </label>
+          <label>
+            Email
+            <input id="email" type="email" placeholder="b2b@mail.ru" required />
+          </label>
+          <label>
+            Password
+            <input
+              id="password"
+              type="password"
+              placeholder="Пароль аккаунта"
+              required
+            />
+          </label>
+          <button class="primary-button" type="submit">
+            <i data-lucide="log-in"></i>
+            Войти и открыть аналитику
+          </button>
+        </form>
+        <p id="setupHint" class="hint"></p>
+      </section>
+
+      <section id="dashboard" class="hidden">
+        <section id="overview" class="metrics-grid"></section>
+
+        <section id="ai" class="layout-two">
+          <div class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">AI аналитика</p>
+                <h2>Качество и нагрузка</h2>
+              </div>
+              <i data-lucide="activity"></i>
+            </div>
+            <div id="aiStats" class="stat-list"></div>
+            <div id="sourceUsage" class="source-list"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Пользователи</p>
+                <h2>Роли и рост</h2>
+              </div>
+              <i data-lucide="user-round-check"></i>
+            </div>
+            <div id="userStats" class="stat-list"></div>
+            <div id="latestUsers" class="compact-table"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">AI журнал</p>
+              <h2>Последние запросы и ответы</h2>
+            </div>
+            <i data-lucide="messages-square"></i>
+          </div>
+          <div id="requestList" class="request-list"></div>
+        </section>
+
+        <section id="commerce" class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Коммерция</p>
+              <h2>Каталог и продажи</h2>
+            </div>
+            <i data-lucide="package-search"></i>
+          </div>
+          <div id="commerceStats" class="metrics-grid compact"></div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

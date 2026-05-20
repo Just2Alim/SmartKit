@@ -90,6 +90,15 @@ npx supabase functions deploy ai-chat business-analysis \
   --use-api
 ```
 
+Если обновлялась админ-панель мониторинга, деплойте также:
+
+```bash
+SUPABASE_ACCESS_TOKEN=YOUR_SUPABASE_ACCESS_TOKEN \
+npx supabase functions deploy admin-dashboard \
+  --project-ref YOUR_PROJECT_REF \
+  --use-api
+```
+
 Проверка AI:
 
 ```bash
@@ -162,6 +171,32 @@ cloudflared tunnel --url http://localhost:8080
 
 Для продакшена лучше использовать VPS, домен и named Cloudflare Tunnel вместо
 quick tunnel, потому что quick tunnel не гарантирует постоянный URL и uptime.
+
+## Отдельная админ-панель
+
+Админка лежит отдельно от Flutter-приложения в `admin/` и вызывает
+`admin-dashboard`.
+
+Локальный запуск:
+
+```bash
+python3 -m http.server 8090 --directory admin
+```
+
+Открыть:
+
+```text
+http://localhost:8090
+```
+
+Для внешней ссылки:
+
+```bash
+cloudflared tunnel --url http://localhost:8090
+```
+
+Войти может только пользователь, который есть в `app_admins`. Миграция
+добавляет `b2b@mail.ru`, если профиль уже создан.
 
 ## Чеклист перед отправкой ссылки
 

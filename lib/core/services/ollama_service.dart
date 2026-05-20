@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../features/ai/models/ai_chat_result.dart';
 import '../../features/medicine/models/medicine_model.dart';
 import '../api/smartkit_api_client.dart';
 import 'ai_service_interface.dart';
@@ -36,9 +37,14 @@ class OllamaService implements AiService {
 
   @override
   Future<String> sendMessage(String text) async {
+    return (await sendRichMessage(text)).message;
+  }
+
+  @override
+  Future<AiChatResult> sendRichMessage(String text, {String? threadId}) async {
     final safetyDecision = AiSafety.screenConsumerRequest(text);
     if (safetyDecision != null) {
-      return safetyDecision.response;
+      return AiChatResult(message: safetyDecision.response, threadId: threadId);
     }
 
     if (_history.isEmpty) {
@@ -50,7 +56,7 @@ class OllamaService implements AiService {
     if (localResponse != null) {
       _history.add({'role': 'user', 'content': promptText});
       _history.add({'role': 'assistant', 'content': localResponse});
-      return localResponse;
+      return AiChatResult(message: localResponse, threadId: threadId);
     }
 
     try {
@@ -58,14 +64,21 @@ class OllamaService implements AiService {
 
       debugPrint('Ollama Request: $text');
 
-      final backendResponse = await _sendViaBackend();
-      if (backendResponse != null && backendResponse.trim().isNotEmpty) {
-        var safeResponse = _appendSafetyIfNeeded(backendResponse.trim(), text);
+      final backendResponse = await _sendViaBackend(
+        userText: text,
+        threadId: threadId,
+      );
+      if (backendResponse != null &&
+          backendResponse.message.trim().isNotEmpty) {
+        var safeResponse = _appendSafetyIfNeeded(
+          backendResponse.message.trim(),
+          text,
+        );
         if (AiSafety.appearsToUseDifferentLanguage(safeResponse, text)) {
           safeResponse = _languageSafeFallback(text);
         }
         _history.add({'role': 'assistant', 'content': safeResponse});
-        return safeResponse;
+        return backendResponse.copyWith(message: safeResponse);
       }
 
       for (final endpoint in _candidateBaseUrls) {
@@ -114,7 +127,7 @@ class OllamaService implements AiService {
             _history.add({'role': 'assistant', 'content': safeResponse});
             debugPrint('Ollama Response: $safeResponse');
 
-            return safeResponse;
+            return AiChatResult(message: safeResponse, threadId: threadId);
           }
 
           debugPrint('Ollama Error Code: ${response.statusCode} at $endpoint');
@@ -123,10 +136,10 @@ class OllamaService implements AiService {
         }
       }
 
-      return _offlineResponse(text);
+      return AiChatResult(message: _offlineResponse(text), threadId: threadId);
     } catch (e) {
       debugPrint('Ollama Error: $e');
-      return _offlineResponse(text);
+      return AiChatResult(message: _offlineResponse(text), threadId: threadId);
     }
   }
 
@@ -173,16 +186,25 @@ class OllamaService implements AiService {
     }
   }
 
-  Future<String?> _sendViaBackend() async {
+  Future<AiChatResult?> _sendViaBackend({
+    required String userText,
+    String? threadId,
+  }) async {
     try {
       final accessToken =
           Supabase.instance.client.auth.currentSession?.accessToken;
       final response = await SmartKitApiClient().postJson(
         'ai-chat',
         accessToken: accessToken,
-        body: {'messages': _history},
+        body: {
+          'message': userText,
+          if (threadId != null && threadId.trim().isNotEmpty)
+            'threadId': threadId.trim(),
+          'scope': 'consumer',
+          'temperature': 0.25,
+        },
       );
-      return response['message']?.toString();
+      return AiChatResult.fromMap(response);
     } catch (error) {
       debugPrint('SmartKit AI gateway unavailable: $error');
       return null;
@@ -214,33 +236,7 @@ class OllamaService implements AiService {
     if (_looksLikeInventoryRequest(lower)) {
       return _inventoryAnalysis(text);
     }
-
-    final owned = _ownedMatches(lower);
-    if (owned.isEmpty) return null;
-
-    final language = AiSafety.detectLanguage(text);
-    final buffer = StringBuffer();
-    switch (language) {
-      case AiResponseLanguage.russian:
-        buffer.writeln('В вашей аптечке есть подходящие категории:');
-        break;
-      case AiResponseLanguage.english:
-        buffer.writeln('Your first-aid kit has potentially relevant items:');
-        break;
-      case AiResponseLanguage.kazakh:
-        buffer.writeln('Дәрі қобдишаңызда сәйкес келуі мүмкін заттар бар:');
-        break;
-    }
-    for (final medicine in owned.take(4)) {
-      buffer.writeln(
-        '• ${medicine.name} (${medicine.quantity} ${_unitLabel(language)})',
-      );
-    }
-    buffer.writeln('\n${_checkLabel(language)}');
-    if (AiSafety.mentionsSymptoms(text)) {
-      buffer.writeln('\n${AiSafety.medicalCaveatForLanguage(language)}');
-    }
-    return buffer.toString();
+    return null;
   }
 
   String _appendSafetyIfNeeded(String responseText, String userText) {

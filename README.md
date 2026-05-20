@@ -27,10 +27,14 @@
 - **OCR Logistics**: MLKit-powered scanning for quick stock receipt and automated product entry.
 - **Smart Logistics**: Occupancy metrics and AI-driven spatial insights for warehouse optimization.
 
-- **Health Chat**: Ask about side effects, dosage, or interactions.
+- **Health Chat**: Ask reference questions about medicines, first-aid kits, and safe next steps without diagnosis or treatment prescription.
+- **Persistent Context**: AI chat history is stored in Supabase and restored per user.
+- **Product Cards**: AI can return concrete catalog items that can be added to the cart from the chat.
+- **Reference Sources**: The server-side AI context can use local knowledge, RxNorm, DailyMed, openFDA Drug Label, and PubMed.
 - **Kit Builder**: Tell the AI your situation, and it will suggest a custom First Aid kit.
 - **Business Intelligence**: Local AI analysis of inventory trends and sales performance.
 - **Privacy First**: All AI processing happens locally via **Ollama**, ensuring your health and business data never leave the device.
+- **Separate Admin Panel**: `admin/` provides AI monitoring, user metrics, commerce stats, and prompt/response observability through `admin-dashboard`.
 
 ### ⏰ Smart Reminders & Notifications
 - **Dose Tracking**: Never miss a medication with automated push notifications.
@@ -48,6 +52,7 @@
 - **Frontend**: [Flutter](https://flutter.dev) (Dart)
 - **Backend**: [Supabase](https://supabase.com) (PostgreSQL, Auth, RLS, Edge Functions)
 - **AI**: Server-side Ollama/Qwen3 gateway
+- **Admin**: Standalone static web dashboard + Supabase Edge Function
 - **Scanning**: [mobile_scanner](https://pub.dev/packages/mobile_scanner) & MLKit OCR
 - **State Management**: Provider
 
@@ -105,6 +110,15 @@ supabase secrets set \
   OLLAMA_API_KEY=$OLLAMA_PROXY_TOKEN
 ```
 
+### Admin Panel
+
+```bash
+python3 -m http.server 8090 --directory admin
+```
+
+Open `http://localhost:8090`, enter the Supabase URL/anon key, and sign in with
+an account listed in `app_admins`.
+
 ---
 
 ## 📂 Project Structure
@@ -120,6 +134,8 @@ lib/
 │   ├── dashboard/      # Main UI and daily overview
 │   └── medicine/       # Scanner and medicine management
 └── main.dart           # App entry point
+admin/                  # Standalone AI/user/commerce monitoring panel
+supabase/functions/     # Edge Functions: ai-chat, business-analysis, admin-dashboard
 ```
 
 ---

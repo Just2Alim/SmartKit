@@ -3,7 +3,7 @@ title: SmartKit - ТЗ PostgreSQL/Supabase backend
 status: implemented-baseline
 owner: JustAlim
 created: 2026-05-20
-updated: 2026-05-20
+updated: 2026-05-21
 tags:
   - smartkit
   - backend
@@ -42,6 +42,11 @@ flowchart LR
 - `b2b_locations`, `b2b_inventory`, `b2b_sales`, `b2b_sale_items`, `b2b_activities` - B2B контур.
 - `barcode_products` - обучаемый справочник штрих-кодов.
 - `chat_threads`, `chat_messages` - история AI-чатов.
+- `ai_sources`, `ai_medical_knowledge` - управляемые справочные источники и
+  локальная база знаний для AI.
+- `ai_request_logs` - observability-журнал prompt/response, источников,
+  карточек товаров, задержки, модели и ошибок.
+- `app_admins` - отдельный доступ к web-админке мониторинга.
 
 ## 4. Доступы
 
@@ -59,8 +64,11 @@ flowchart LR
 ## 5. Edge Functions
 
 - `health` - smoke-test backend.
-- `ai-chat` - общий AI gateway.
+- `ai-chat` - общий AI gateway с сохранением контекста, источниками,
+  карточками товаров и логированием.
 - `business-analysis` - B2B AI анализ с чтением данных организации из PostgreSQL.
+- `admin-dashboard` - агрегированный мониторинг AI, пользователей, каталога и
+  продаж для отдельной web-админки.
 
 Secrets для функций:
 
@@ -98,8 +106,27 @@ flutter run -d chrome --dart-define-from-file=.env
 - Checkout через transactional RPC.
 - AI через server-side gateway с offline fallback.
 - Qwen3 используется как дефолтная Ollama-модель (`qwen3:latest`).
+- AI-чат восстанавливает последний `chat_threads` и показывает сохраненные
+  `chat_messages`.
+- AI-ответ может содержать `productSuggestions`; Flutter показывает карточки
+  товаров и кнопку добавления в корзину.
 
-## 7. Командная разработка
+## 7. AI safety и источники
+
+AI больше не ограничен только домашней аптечкой. Он может объяснять
+безрецептурные категории, использовать публичный каталог и ссылаться на
+справочные источники. Ограничения остаются жесткими:
+
+- не ставить диагноз;
+- не назначать персональные дозировки и курсы;
+- не рекомендовать антибиотики, гормоны, сердечные, диабетические и другие
+  рецептурные препараты без врача;
+- при экстренных симптомах направлять на 103/112;
+- для детей, беременности, ГВ, хронических болезней, аллергий и сложных случаев
+  направлять к врачу/фармацевту;
+- всегда просить проверить инструкцию, противопоказания и срок годности.
+
+## 8. Командная разработка
 
 Все разработчики получают:
 
@@ -112,7 +139,7 @@ flutter run -d chrome --dart-define-from-file=.env
 
 Production secrets не коммитятся и не отправляются в чат.
 
-## 8. Definition of Done
+## 9. Definition of Done
 
 - Приложение собирается без старого backend SDK.
 - Auth работает через Supabase.
@@ -120,4 +147,7 @@ Production secrets не коммитятся и не отправляются в
 - B2B-команда работает через `organization_members`.
 - Checkout атомарно списывает склад.
 - AI-чат доступен через серверный endpoint.
+- AI-чат сохраняет контекст пользователя.
+- AI может возвращать карточки товаров из каталога для корзины.
+- Отдельная web-админка показывает мониторинг AI и приложения.
 - Новый разработчик запускает проект по README и `.env.example`.
