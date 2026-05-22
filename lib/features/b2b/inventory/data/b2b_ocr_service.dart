@@ -180,7 +180,7 @@ class B2BOcrService {
   String? _extractPackageSize(String text) {
     final patterns = [
       RegExp(
-        r'\b(?:№|n|no\.?|x)?\s?\d{1,4}\s*(?:табл\.?|таблет(?:ок|ки)?|капс\.?|капсул(?:а|ы)?|caps?|tablets?|амп\.?|ампул(?:а|ы)?|флак\.?|саше|пакет(?:ик)?|шт\.?|pcs?)\b',
+        r'(?:№\s?\d{1,4}|\b(?:n|no\.?|x)?\s?\d{1,4}\s*(?:табл\.?|таблет(?:ок|ки)?|капс\.?|капсул(?:а|ы)?|caps?|tablets?|амп\.?|ампул(?:а|ы)?|флак\.?|саше|пакет(?:ик)?|шт\.?|pcs?)\b)',
         caseSensitive: false,
       ),
       RegExp(

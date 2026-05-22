@@ -8,6 +8,7 @@ import '../../family/data/family_repository.dart';
 import '../../family/models/family_member_model.dart';
 import '../../b2b/inventory/data/b2b_ocr_service.dart';
 import '../data/medicine_repository.dart';
+import '../domain/medicine_quick_parser.dart';
 import '../models/medicine_model.dart';
 import '../../../core/router/app_routes.dart';
 
@@ -15,12 +16,14 @@ class AddMedicineScreen extends StatefulWidget {
   final String? preselectedMemberId;
   final String? initialName;
   final String? initialCategory;
+  final Map<String, dynamic>? initialData;
 
   const AddMedicineScreen({
     super.key,
     this.preselectedMemberId,
     this.initialName,
     this.initialCategory,
+    this.initialData,
   });
 
   @override
@@ -39,9 +42,15 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   final manufacturerCtrl = TextEditingController();
   final packageSizeCtrl = TextEditingController();
   final batchCtrl = TextEditingController();
+  final quickCtrl = TextEditingController();
+  final formCtrl = TextEditingController();
+  final unitCtrl = TextEditingController(text: 'шт');
+  final storageCtrl = TextEditingController();
+  final lowStockCtrl = TextEditingController(text: '3');
 
   String selectedCategory = 'Обезболивающее';
   DateTime? selectedDate;
+  DateTime? openedDate;
   bool isLoading = false;
   bool isScanningPackage = false;
   String? scanSource;
@@ -89,8 +98,19 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     }
 
     if (widget.initialCategory != null &&
-        categories.contains(widget.initialCategory)) {
+        widget.initialCategory!.trim().isNotEmpty) {
       selectedCategory = widget.initialCategory!;
+    }
+
+    if (widget.initialData != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (widget.initialData!['openBulk'] == true) {
+          _showBulkAddSheet();
+        } else {
+          _applyScanResult(widget.initialData!);
+        }
+      });
     }
   }
 
@@ -104,6 +124,11 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     manufacturerCtrl.dispose();
     packageSizeCtrl.dispose();
     batchCtrl.dispose();
+    quickCtrl.dispose();
+    formCtrl.dispose();
+    unitCtrl.dispose();
+    storageCtrl.dispose();
+    lowStockCtrl.dispose();
     super.dispose();
   }
 
@@ -132,6 +157,211 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
       setState(() {
         selectedDate = result;
       });
+    }
+  }
+
+  Future<void> pickOpenedDate() async {
+    final now = DateTime.now();
+    final result = await showDatePicker(
+      context: context,
+      initialDate: openedDate ?? now,
+      firstDate: DateTime(now.year - 5),
+      lastDate: now,
+    );
+
+    if (result != null) {
+      setState(() {
+        openedDate = result;
+      });
+    }
+  }
+
+  void _applyQuickInput() {
+    final draft = MedicineQuickParser.parseLine(quickCtrl.text);
+    final name = draft['name']?.toString().trim();
+    if (name == null || name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Напишите лекарство одной строкой')),
+      );
+      return;
+    }
+
+    _applyScanResult(draft);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Поля заполнены из быстрого ввода')),
+    );
+  }
+
+  Future<void> _showBulkAddSheet() async {
+    final controller = TextEditingController();
+    final text = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder:
+          (context) => Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              8,
+              20,
+              20 + MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Добавить списком',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Пример: Парацетамол 500мг №20 до 12.2026',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: controller,
+                    minLines: 5,
+                    maxLines: 9,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      hintText:
+                          'Парацетамол 500мг №20 до 12.2026\nСупрастин №20 до 03.2027\nСмекта 10 саше',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: FilledButton.icon(
+                      onPressed: () => Navigator.pop(context, controller.text),
+                      icon: const Icon(Icons.playlist_add_check_rounded),
+                      label: const Text('Разобрать и сохранить'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+    );
+    controller.dispose();
+
+    if (text == null) return;
+    final drafts = MedicineQuickParser.parseBulk(text);
+    if (drafts.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Не получилось найти лекарства в списке')),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('Сохранить ${drafts.length} позиций?'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ...drafts.take(5).map((draft) {
+                  final dosage = draft['dosage']?.toString();
+                  final quantity = draft['quantity']?.toString() ?? '1';
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      '${draft['name']} ${dosage ?? ''} - $quantity ${draft['unitLabel'] ?? 'шт'}',
+                    ),
+                  );
+                }),
+                if (drafts.length > 5)
+                  Text('И еще ${drafts.length - 5} позиций...'),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Отмена'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Сохранить'),
+              ),
+            ],
+          ),
+    );
+
+    if (confirm == true) {
+      await _saveDrafts(drafts);
+    }
+  }
+
+  Future<void> _saveDrafts(List<Map<String, dynamic>> drafts) async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Пользователь не найден')));
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    try {
+      final medicines =
+          drafts
+              .map((draft) {
+                final quantity =
+                    int.tryParse(draft['quantity']?.toString() ?? '') ?? 1;
+                return MedicineModel(
+                  id: '',
+                  userId: user.id,
+                  familyMemberId: selectedOwner == 'me' ? null : selectedOwner,
+                  name: draft['name']?.toString().trim() ?? '',
+                  dosage: draft['dosage']?.toString().trim() ?? '',
+                  quantity: quantity,
+                  category:
+                      draft['category']?.toString().trim() ?? selectedCategory,
+                  notes: null,
+                  expiryDate: _parseDate(draft['expiryDate']),
+                  createdAt: DateTime.now(),
+                  packageSize: draft['packageSize']?.toString(),
+                  scanSource: draft['source']?.toString(),
+                  form: draft['form']?.toString(),
+                  unitLabel: draft['unitLabel']?.toString() ?? 'шт',
+                  storagePlace:
+                      draft['storagePlace']?.toString() ??
+                      _optional(storageCtrl.text),
+                  lowStockThreshold:
+                      int.tryParse(lowStockCtrl.text.trim()) ?? 3,
+                  initialQuantity: quantity,
+                );
+              })
+              .where((medicine) => medicine.name.isNotEmpty)
+              .toList();
+
+      await _repository.addMedicines(medicines);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Сохранено: ${medicines.length} позиций')),
+      );
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Ошибка сохранения: $e')));
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -266,6 +496,10 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
       _fill(manufacturerCtrl, result['manufacturer'] ?? result['brand']);
       _fill(packageSizeCtrl, result['packageSize']);
       _fill(batchCtrl, result['batchNumber']);
+      _fill(formCtrl, result['form']);
+      _fill(unitCtrl, result['unitLabel']);
+      _fill(storageCtrl, result['storagePlace']);
+      _fill(lowStockCtrl, result['lowStockThreshold']);
 
       final category = result['category']?.toString().trim();
       if (category != null && category.isNotEmpty) {
@@ -275,7 +509,9 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
       final expiry = _parseDate(result['expiryDate']);
       if (expiry != null) selectedDate = expiry;
 
-      final quantity = _extractQuantity(result['packageSize']);
+      final quantity =
+          int.tryParse(result['quantity']?.toString() ?? '') ??
+          _extractQuantity(result['packageSize']);
       if (quantity != null && quantityCtrl.text.trim().isEmpty) {
         quantityCtrl.text = quantity.toString();
       }
@@ -318,22 +554,27 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
       return;
     }
 
-    if (nameCtrl.text.trim().isEmpty ||
-        dosageCtrl.text.trim().isEmpty ||
-        quantityCtrl.text.trim().isEmpty) {
+    if (nameCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Заполните обязательные поля')),
+        const SnackBar(content: Text('Укажите название лекарства')),
       );
       return;
     }
 
-    final quantity = int.tryParse(quantityCtrl.text.trim());
-    if (quantity == null) {
+    final quantity =
+        quantityCtrl.text.trim().isEmpty
+            ? 1
+            : int.tryParse(quantityCtrl.text.trim());
+    if (quantity == null || quantity < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Количество должно быть числом')),
+        const SnackBar(
+          content: Text('Количество должно быть числом не меньше нуля'),
+        ),
       );
       return;
     }
+
+    final lowStockThreshold = int.tryParse(lowStockCtrl.text.trim()) ?? 3;
 
     setState(() => isLoading = true);
 
@@ -354,6 +595,12 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         packageSize: _optional(packageSizeCtrl.text),
         batchNumber: _optional(batchCtrl.text),
         scanSource: scanSource,
+        form: _optional(formCtrl.text),
+        unitLabel: _optional(unitCtrl.text) ?? 'шт',
+        storagePlace: _optional(storageCtrl.text),
+        lowStockThreshold: lowStockThreshold < 0 ? 3 : lowStockThreshold,
+        initialQuantity: quantity,
+        openedAt: openedDate,
       );
 
       await _repository.addMedicine(medicine);
@@ -368,6 +615,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
             'dosage': medicine.dosage,
             'packageSize': medicine.packageSize,
             'batchNumber': medicine.batchNumber,
+            'source': medicine.scanSource,
           },
         );
       }
@@ -402,6 +650,69 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
           fontWeight: FontWeight.w700,
           color: Theme.of(context).colorScheme.onSurface,
         ),
+      ),
+    );
+  }
+
+  Widget _buildQuickEntryCard() {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.bolt_rounded, color: colorScheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Быстрое добавление',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: quickCtrl,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _applyQuickInput(),
+            decoration: const InputDecoration(
+              hintText: 'Парацетамол 500мг №20 до 12.2026',
+              prefixIcon: Icon(Icons.edit_note_rounded),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: isLoading ? null : _applyQuickInput,
+                  icon: const Icon(Icons.auto_fix_high_rounded),
+                  label: const Text('Заполнить'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: isLoading ? null : _showBulkAddSheet,
+                  icon: const Icon(Icons.playlist_add_rounded),
+                  label: const Text('Списком'),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -452,6 +763,9 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
               ),
               const SizedBox(height: 16),
 
+              _buildQuickEntryCard(),
+              const SizedBox(height: 20),
+
               _label('Название'),
               TextField(
                 controller: nameCtrl,
@@ -499,6 +813,75 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                 controller: quantityCtrl,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(hintText: 'Например: 20'),
+              ),
+              const SizedBox(height: 16),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _label('Форма'),
+                        TextField(
+                          controller: formCtrl,
+                          decoration: const InputDecoration(
+                            hintText: 'Таблетки, сироп, капли',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _label('Ед. учета'),
+                        TextField(
+                          controller: unitCtrl,
+                          decoration: const InputDecoration(hintText: 'шт'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _label('Место хранения'),
+                        TextField(
+                          controller: storageCtrl,
+                          decoration: const InputDecoration(
+                            hintText: 'Домашняя аптечка, холодильник',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _label('Мин. остаток'),
+                        TextField(
+                          controller: lowStockCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(hintText: '3'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
 
@@ -568,6 +951,50 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                         style: TextStyle(
                           color:
                               selectedDate == null
+                                  ? Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant
+                                  : Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              _label('Дата вскрытия'),
+              InkWell(
+                onTap: pickOpenedDate,
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.lock_open_rounded,
+                        size: 18,
+                        color: Color(0xFF6B7280),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        openedDate == null
+                            ? 'Не указано'
+                            : '${openedDate!.day.toString().padLeft(2, '0')}.${openedDate!.month.toString().padLeft(2, '0')}.${openedDate!.year}',
+                        style: TextStyle(
+                          color:
+                              openedDate == null
                                   ? Theme.of(
                                     context,
                                   ).colorScheme.onSurfaceVariant

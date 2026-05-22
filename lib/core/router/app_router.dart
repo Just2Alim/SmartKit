@@ -87,6 +87,7 @@ class AppRouter {
               preselectedMemberId: args['memberId'] as String?,
               initialName: args['name'] as String?,
               initialCategory: args['category'] as String?,
+              initialData: args,
             ),
           );
         }

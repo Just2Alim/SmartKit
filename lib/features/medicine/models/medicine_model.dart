@@ -14,6 +14,13 @@ class MedicineModel {
   final String? packageSize;
   final String? batchNumber;
   final String? scanSource;
+  final String? form;
+  final String unitLabel;
+  final String? storagePlace;
+  final int lowStockThreshold;
+  final int? initialQuantity;
+  final DateTime? openedAt;
+  final DateTime? updatedAt;
 
   MedicineModel({
     required this.id,
@@ -31,6 +38,13 @@ class MedicineModel {
     this.packageSize,
     this.batchNumber,
     this.scanSource,
+    this.form,
+    this.unitLabel = 'шт',
+    this.storagePlace,
+    this.lowStockThreshold = 3,
+    this.initialQuantity,
+    this.openedAt,
+    this.updatedAt,
   });
 
   Map<String, dynamic> toMap() {
@@ -49,6 +63,13 @@ class MedicineModel {
       'package_size': packageSize,
       'batch_number': batchNumber,
       'scan_source': scanSource,
+      'form': form,
+      'unit_label': unitLabel,
+      'storage_place': storagePlace,
+      'low_stock_threshold': lowStockThreshold,
+      'initial_quantity': initialQuantity ?? quantity,
+      'opened_at': openedAt?.toIso8601String(),
+      'updated_at': updatedAt?.toIso8601String(),
     };
   }
 
@@ -76,6 +97,14 @@ class MedicineModel {
       packageSize: data['package_size'] ?? data['packageSize'],
       batchNumber: data['batch_number'] ?? data['batchNumber'],
       scanSource: data['scan_source'] ?? data['scanSource'],
+      form: data['form'],
+      unitLabel: data['unit_label'] ?? data['unitLabel'] ?? 'шт',
+      storagePlace: data['storage_place'] ?? data['storagePlace'],
+      lowStockThreshold:
+          data['low_stock_threshold'] ?? data['lowStockThreshold'] ?? 3,
+      initialQuantity: data['initial_quantity'] ?? data['initialQuantity'],
+      openedAt: parseDate(data['opened_at'] ?? data['openedAt']),
+      updatedAt: parseDate(data['updated_at'] ?? data['updatedAt']),
     );
   }
 }

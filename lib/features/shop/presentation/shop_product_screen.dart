@@ -90,6 +90,26 @@ class _ShopProductScreenState extends State<ShopProductScreen> {
         );
   }
 
+  void _addSelectedToCart() {
+    if (_quantityInCart() + _quantity > _stock) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('В корзине уже выбран весь остаток')),
+      );
+      return;
+    }
+
+    CartProvider.instance.addItem(widget.product, quantity: _quantity);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Товар добавлен в корзину'),
+        action: SnackBarAction(
+          label: 'Открыть',
+          onPressed: () => Navigator.pushNamed(context, AppRoutes.cart),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final Color itemColor = widget.product['color'] as Color;
@@ -119,32 +139,33 @@ class _ShopProductScreenState extends State<ShopProductScreen> {
           ),
         ],
       ),
+      bottomNavigationBar: _bottomActionBar(canBuy),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 108),
           children: [
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [itemColor, Colors.white],
+                  colors: [itemColor, Theme.of(context).cardColor],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: iconColor.withOpacity(0.12)),
+                border: Border.all(color: iconColor.withValues(alpha: 0.12)),
               ),
               child: Center(
                 child: Container(
                   width: 104,
                   height: 104,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(28),
                     boxShadow: [
                       BoxShadow(
-                        color: iconColor.withOpacity(0.16),
+                        color: iconColor.withValues(alpha: 0.16),
                         blurRadius: 24,
                         offset: const Offset(0, 12),
                       ),
@@ -206,55 +227,57 @@ class _ShopProductScreenState extends State<ShopProductScreen> {
             _quantityControl(),
             const SizedBox(height: 24),
             ..._details().map(_detailTile),
-            const SizedBox(height: 28),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton.icon(
-                onPressed:
-                    canBuy
-                        ? () {
-                          if (_quantityInCart() + _quantity > _stock) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'В корзине уже выбран весь остаток',
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-                          CartProvider.instance.addItem(
-                            widget.product,
-                            quantity: _quantity,
-                          );
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Товар добавлен в корзину'),
-                            ),
-                          );
-                        }
-                        : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF10B981),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                ),
-                icon: const Icon(Icons.add_shopping_cart_rounded),
-                label: Text(
-                  canBuy
-                      ? 'Добавить $_quantity шт. • ${_formatPrice(_price * _quantity)}'
-                      : 'Нет в наличии',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _bottomActionBar(bool canBuy) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        border: Border(
+          top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+        ),
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 16,
+            offset: const Offset(0, -6),
+            color: Colors.black.withValues(
+              alpha:
+                  Theme.of(context).brightness == Brightness.dark ? 0.24 : 0.05,
+            ),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton.icon(
+            onPressed: canBuy ? _addSelectedToCart : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+              disabledBackgroundColor:
+                  Theme.of(context).colorScheme.surfaceContainerHighest,
+              disabledForegroundColor:
+                  Theme.of(context).colorScheme.onSurfaceVariant,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
               ),
             ),
-          ],
+            icon: const Icon(Icons.add_shopping_cart_rounded),
+            label: Text(
+              canBuy
+                  ? 'Добавить $_quantity шт. • ${_formatPrice(_price * _quantity)}'
+                  : 'Нет в наличии',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+            ),
+          ),
         ),
       ),
     );

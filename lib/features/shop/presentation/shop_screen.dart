@@ -42,6 +42,11 @@ class _ShopScreenState extends State<ShopScreen> {
     }).toList();
   }
 
+  void _clearFilters() {
+    _searchController.clear();
+    setState(() => _selectedCategory = 'Все');
+  }
+
   Map<String, dynamic> _productMap(B2BInventoryModel product) {
     return ShopProductMapper.toProductMap(product);
   }
@@ -63,7 +68,13 @@ class _ShopScreenState extends State<ShopScreen> {
 
     CartProvider.instance.addItem(_productMap(product));
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${product.name} добавлен в корзину')),
+      SnackBar(
+        content: Text('${product.name} добавлен в корзину'),
+        action: SnackBarAction(
+          label: 'Открыть',
+          onPressed: () => Navigator.pushNamed(context, AppRoutes.cart),
+        ),
+      ),
     );
   }
 
@@ -77,19 +88,33 @@ class _ShopScreenState extends State<ShopScreen> {
           initialData: const [],
           builder: (context, snapshot) {
             final products = snapshot.data ?? [];
+            final availableProducts =
+                products.where((item) => item.stock > 0).length;
             final categories = [
               'Все',
               ...products.map((item) => item.category).toSet().toList()..sort(),
             ];
             final visibleProducts = _filterProducts(products);
+            final columns = MediaQuery.of(context).size.width > 640 ? 3 : 2;
+            final ratio = MediaQuery.of(context).size.width < 380 ? 0.62 : 0.68;
 
             return CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
                 SliverToBoxAdapter(
-                  child: _buildHeader(context, products.length),
+                  child: _buildHeader(
+                    context,
+                    products.length,
+                    availableProducts,
+                  ),
                 ),
-                SliverToBoxAdapter(child: _buildSearchAndFilters(categories)),
+                SliverToBoxAdapter(
+                  child: _buildSearchAndFilters(
+                    categories,
+                    visibleProducts.length,
+                    products.length,
+                  ),
+                ),
                 if (snapshot.hasError)
                   SliverFillRemaining(
                     child: _emptyState(
@@ -99,10 +124,16 @@ class _ShopScreenState extends State<ShopScreen> {
                 else if (products.isEmpty)
                   SliverFillRemaining(child: _emptyState('Витрина пока пуста'))
                 else if (visibleProducts.isEmpty)
-                  SliverFillRemaining(child: _emptyState('Ничего не найдено'))
+                  SliverFillRemaining(
+                    child: _emptyState(
+                      'Ничего не найдено',
+                      actionLabel: 'Сбросить фильтры',
+                      onAction: _clearFilters,
+                    ),
+                  )
                 else
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 112),
                     sliver: SliverGrid(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) =>
@@ -110,11 +141,10 @@ class _ShopScreenState extends State<ShopScreen> {
                         childCount: visibleProducts.length,
                       ),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount:
-                            MediaQuery.of(context).size.width > 640 ? 3 : 2,
+                        crossAxisCount: columns,
                         mainAxisSpacing: 14,
                         crossAxisSpacing: 14,
-                        childAspectRatio: 0.68,
+                        childAspectRatio: ratio,
                       ),
                     ),
                   ),
@@ -123,10 +153,16 @@ class _ShopScreenState extends State<ShopScreen> {
           },
         ),
       ),
+      floatingActionButton: _buildCartBar(context),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 
-  Widget _buildHeader(BuildContext context, int productCount) {
+  Widget _buildHeader(
+    BuildContext context,
+    int productCount,
+    int availableProducts,
+  ) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
       child: Container(
@@ -142,7 +178,7 @@ class _ShopScreenState extends State<ShopScreen> {
             BoxShadow(
               blurRadius: 22,
               offset: const Offset(0, 12),
-              color: const Color(0xFF047857).withOpacity(0.18),
+              color: const Color(0xFF047857).withValues(alpha: 0.18),
             ),
           ],
         ),
@@ -155,7 +191,7 @@ class _ShopScreenState extends State<ShopScreen> {
                   width: 54,
                   height: 54,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.14),
+                    color: Colors.white.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: const Icon(
@@ -197,9 +233,9 @@ class _ShopScreenState extends State<ShopScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              '$productCount товаров в наличии • проверенные складские остатки',
+              '$productCount товаров в каталоге • $availableProducts доступно сейчас',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.78),
+                color: Colors.white.withValues(alpha: 0.78),
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
@@ -210,7 +246,14 @@ class _ShopScreenState extends State<ShopScreen> {
     );
   }
 
-  Widget _buildSearchAndFilters(List<String> categories) {
+  Widget _buildSearchAndFilters(
+    List<String> categories,
+    int visibleCount,
+    int totalCount,
+  ) {
+    final hasFilters =
+        _selectedCategory != 'Все' || _searchController.text.trim().isNotEmpty;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
       child: Column(
@@ -271,6 +314,28 @@ class _ShopScreenState extends State<ShopScreen> {
               },
             ),
           ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  hasFilters
+                      ? 'Показано $visibleCount из $totalCount'
+                      : 'Быстрый подбор по категории',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              if (hasFilters)
+                TextButton(
+                  onPressed: _clearFilters,
+                  child: const Text('Сбросить'),
+                ),
+            ],
+          ),
         ],
       ),
     );
@@ -278,7 +343,26 @@ class _ShopScreenState extends State<ShopScreen> {
 
   Widget _productCard(BuildContext context, B2BInventoryModel product) {
     final color = ShopProductMapper.categoryColor(product.category);
-    final lowStock = product.stock <= product.minStock;
+    final outOfStock = product.stock <= 0;
+    final lowStock = !outOfStock && product.stock <= product.minStock;
+    final stockLabel =
+        outOfStock
+            ? 'Нет'
+            : lowStock
+            ? 'Мало'
+            : '${product.stock} шт';
+    final stockBackground =
+        outOfStock
+            ? const Color(0xFFFEF2F2)
+            : lowStock
+            ? const Color(0xFFFFF7ED)
+            : const Color(0xFFECFDF5);
+    final stockColor =
+        outOfStock
+            ? const Color(0xFFDC2626)
+            : lowStock
+            ? const Color(0xFFEA580C)
+            : const Color(0xFF047857);
 
     return Material(
       color: Theme.of(context).cardColor,
@@ -321,7 +405,7 @@ class _ShopScreenState extends State<ShopScreen> {
                     width: 52,
                     height: 52,
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.12),
+                      color: color.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(17),
                     ),
                     child: Icon(
@@ -336,19 +420,13 @@ class _ShopScreenState extends State<ShopScreen> {
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color:
-                          lowStock
-                              ? const Color(0xFFFFF7ED)
-                              : const Color(0xFFECFDF5),
+                      color: stockBackground,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
-                      lowStock ? 'Мало' : '${product.stock} шт',
+                      stockLabel,
                       style: TextStyle(
-                        color:
-                            lowStock
-                                ? const Color(0xFFEA580C)
-                                : const Color(0xFF047857),
+                        color: stockColor,
                         fontSize: 11,
                         fontWeight: FontWeight.w900,
                       ),
@@ -415,13 +493,19 @@ class _ShopScreenState extends State<ShopScreen> {
                     height: 40,
                     child: IconButton(
                       onPressed:
-                          product.stock <= 0
+                          outOfStock
                               ? null
                               : () => _addToCart(context, product),
                       padding: EdgeInsets.zero,
                       style: IconButton.styleFrom(
                         backgroundColor: const Color(0xFF10B981),
                         foregroundColor: Colors.white,
+                        disabledBackgroundColor:
+                            Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
+                        disabledForegroundColor:
+                            Theme.of(context).colorScheme.onSurfaceVariant,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -441,7 +525,72 @@ class _ShopScreenState extends State<ShopScreen> {
     );
   }
 
-  Widget _emptyState(String text) {
+  Widget _buildCartBar(BuildContext context) {
+    return ListenableBuilder(
+      listenable: CartProvider.instance,
+      builder: (context, _) {
+        final count = CartProvider.instance.itemCount;
+        if (count == 0) return const SizedBox.shrink();
+
+        return SizedBox(
+          width: MediaQuery.of(context).size.width - 40,
+          height: 58,
+          child: Material(
+            color: const Color(0xFF10B981),
+            borderRadius: BorderRadius.circular(20),
+            elevation: 0,
+            shadowColor: const Color(0xFF047857).withValues(alpha: 0.24),
+            child: InkWell(
+              onTap: () => Navigator.pushNamed(context, AppRoutes.cart),
+              borderRadius: BorderRadius.circular(20),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Row(
+                  children: [
+                    Badge.count(
+                      count: count,
+                      backgroundColor: const Color(0xFFF59E0B),
+                      child: const Icon(
+                        Icons.shopping_bag_rounded,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Text(
+                        'Перейти к корзине',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      ShopProductMapper.formatPrice(
+                        CartProvider.instance.totalPrice,
+                      ),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _emptyState(
+    String text, {
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -470,6 +619,10 @@ class _ShopScreenState extends State<ShopScreen> {
                 fontWeight: FontWeight.w900,
               ),
             ),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 16),
+              ElevatedButton(onPressed: onAction, child: Text(actionLabel)),
+            ],
           ],
         ),
       ),

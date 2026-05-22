@@ -22,9 +22,14 @@ class _EditMedicineScreenState extends State<EditMedicineScreen> {
   final dosageCtrl = TextEditingController();
   final quantityCtrl = TextEditingController();
   final notesCtrl = TextEditingController();
+  final formCtrl = TextEditingController();
+  final unitCtrl = TextEditingController(text: 'шт');
+  final storageCtrl = TextEditingController();
+  final lowStockCtrl = TextEditingController(text: '3');
 
   String selectedCategory = 'Обезболивающее';
   DateTime? selectedDate;
+  DateTime? openedDate;
   String selectedOwner = 'me';
 
   bool isLoading = true;
@@ -67,6 +72,10 @@ class _EditMedicineScreenState extends State<EditMedicineScreen> {
     dosageCtrl.dispose();
     quantityCtrl.dispose();
     notesCtrl.dispose();
+    formCtrl.dispose();
+    unitCtrl.dispose();
+    storageCtrl.dispose();
+    lowStockCtrl.dispose();
     super.dispose();
   }
 
@@ -95,7 +104,12 @@ class _EditMedicineScreenState extends State<EditMedicineScreen> {
       notesCtrl.text = medicine.notes ?? '';
       selectedCategory = medicine.category;
       selectedDate = medicine.expiryDate;
+      openedDate = medicine.openedAt;
       selectedOwner = medicine.familyMemberId ?? 'me';
+      formCtrl.text = medicine.form ?? '';
+      unitCtrl.text = medicine.unitLabel;
+      storageCtrl.text = medicine.storagePlace ?? '';
+      lowStockCtrl.text = medicine.lowStockThreshold.toString();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -126,20 +140,39 @@ class _EditMedicineScreenState extends State<EditMedicineScreen> {
     }
   }
 
+  Future<void> pickOpenedDate() async {
+    final now = DateTime.now();
+    final result = await showDatePicker(
+      context: context,
+      initialDate: openedDate ?? now,
+      firstDate: DateTime(now.year - 5),
+      lastDate: now,
+    );
+
+    if (result != null) {
+      setState(() {
+        openedDate = result;
+      });
+    }
+  }
+
   Future<void> saveChanges() async {
-    if (nameCtrl.text.trim().isEmpty ||
-        dosageCtrl.text.trim().isEmpty ||
-        quantityCtrl.text.trim().isEmpty) {
+    if (nameCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Заполните обязательные поля')),
+        const SnackBar(content: Text('Укажите название лекарства')),
       );
       return;
     }
 
-    final quantity = int.tryParse(quantityCtrl.text.trim());
-    if (quantity == null) {
+    final quantity =
+        quantityCtrl.text.trim().isEmpty
+            ? 1
+            : int.tryParse(quantityCtrl.text.trim());
+    if (quantity == null || quantity < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Количество должно быть числом')),
+        const SnackBar(
+          content: Text('Количество должно быть числом не меньше нуля'),
+        ),
       );
       return;
     }
@@ -156,6 +189,12 @@ class _EditMedicineScreenState extends State<EditMedicineScreen> {
         notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
         familyMemberId: selectedOwner == 'me' ? null : selectedOwner,
         expiryDate: selectedDate,
+        form: formCtrl.text.trim().isEmpty ? null : formCtrl.text.trim(),
+        unitLabel: unitCtrl.text.trim().isEmpty ? 'шт' : unitCtrl.text.trim(),
+        storagePlace:
+            storageCtrl.text.trim().isEmpty ? null : storageCtrl.text.trim(),
+        lowStockThreshold: int.tryParse(lowStockCtrl.text.trim()) ?? 3,
+        openedAt: openedDate,
       );
 
       if (!mounted) return;
@@ -264,6 +303,75 @@ class _EditMedicineScreenState extends State<EditMedicineScreen> {
               ),
               const SizedBox(height: 16),
 
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _label('Форма'),
+                        TextField(
+                          controller: formCtrl,
+                          decoration: const InputDecoration(
+                            hintText: 'Таблетки, сироп, капли',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _label('Ед. учета'),
+                        TextField(
+                          controller: unitCtrl,
+                          decoration: const InputDecoration(hintText: 'шт'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _label('Место хранения'),
+                        TextField(
+                          controller: storageCtrl,
+                          decoration: const InputDecoration(
+                            hintText: 'Домашняя аптечка',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _label('Мин. остаток'),
+                        TextField(
+                          controller: lowStockCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(hintText: '3'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
               _label('Категория'),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -326,6 +434,46 @@ class _EditMedicineScreenState extends State<EditMedicineScreen> {
                         style: TextStyle(
                           color:
                               selectedDate == null
+                                  ? const Color(0xFF9CA3AF)
+                                  : const Color(0xFF111827),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              _label('Дата вскрытия'),
+              InkWell(
+                onTap: pickOpenedDate,
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.lock_open_rounded,
+                        size: 18,
+                        color: Color(0xFF6B7280),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        openedDate == null
+                            ? 'Не указано'
+                            : '${openedDate!.day.toString().padLeft(2, '0')}.${openedDate!.month.toString().padLeft(2, '0')}.${openedDate!.year}',
+                        style: TextStyle(
+                          color:
+                              openedDate == null
                                   ? const Color(0xFF9CA3AF)
                                   : const Color(0xFF111827),
                         ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/router/app_routes.dart';
 import '../../../core/state/cart_provider.dart';
 import '../../b2b/inventory/data/b2b_inventory_repository.dart';
 import '../../b2b/inventory/data/b2b_sales_repository.dart';
@@ -41,7 +42,11 @@ class _CartScreenState extends State<CartScreen> {
         0;
   }
 
-  Widget _quantityButton(IconData icon, VoidCallback onPressed) {
+  Widget _quantityButton(
+    BuildContext context,
+    IconData icon,
+    VoidCallback onPressed,
+  ) {
     return SizedBox(
       width: 34,
       height: 34,
@@ -50,12 +55,129 @@ class _CartScreenState extends State<CartScreen> {
         icon: Icon(icon, size: 18),
         padding: EdgeInsets.zero,
         style: IconButton.styleFrom(
-          backgroundColor: const Color(0xFFF1F5F9),
-          foregroundColor: const Color(0xFF0F172A),
+          backgroundColor:
+              Theme.of(context).colorScheme.surfaceContainerHighest,
+          foregroundColor: Theme.of(context).colorScheme.onSurface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _emptyCartState(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 92,
+              height: 92,
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+              ),
+              child: Icon(
+                Icons.shopping_bag_outlined,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                size: 42,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Корзина пока пуста',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Добавьте товары из витрины, а мы проверим актуальные остатки перед оформлением.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 22),
+            ElevatedButton.icon(
+              onPressed: () {
+                if (Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                } else {
+                  Navigator.pushNamed(context, AppRoutes.shop);
+                }
+              },
+              icon: const Icon(Icons.storefront_rounded),
+              label: const Text('Вернуться в магазин'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _checkoutSummaryCard(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B981).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: const Icon(
+              Icons.verified_user_outlined,
+              color: Color(0xFF10B981),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Проверка перед оплатой',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Перед заказом сверим остатки и не дадим оформить недоступный товар.',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -166,17 +288,13 @@ class _CartScreenState extends State<CartScreen> {
           body: SafeArea(
             child:
                 cartItems.isEmpty
-                    ? Center(
-                      child: Text(
-                        'Корзина пока пуста',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    )
+                    ? _emptyCartState(context)
                     : Column(
                       children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                          child: _checkoutSummaryCard(context),
+                        ),
                         Expanded(
                           child: ListView.separated(
                             padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
@@ -211,7 +329,9 @@ class _CartScreenState extends State<CartScreen> {
                                     BoxShadow(
                                       blurRadius: 10,
                                       offset: const Offset(0, 4),
-                                      color: Colors.black.withOpacity(0.04),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.04,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -221,7 +341,7 @@ class _CartScreenState extends State<CartScreen> {
                                       width: 58,
                                       height: 58,
                                       decoration: BoxDecoration(
-                                        color: itemColor.withOpacity(0.1),
+                                        color: itemColor.withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(18),
                                       ),
                                       child: Icon(icon, color: iconColor),
@@ -258,6 +378,7 @@ class _CartScreenState extends State<CartScreen> {
                                           Row(
                                             children: [
                                               _quantityButton(
+                                                context,
                                                 Icons.remove_rounded,
                                                 () {
                                                   CartProvider.instance
@@ -282,6 +403,7 @@ class _CartScreenState extends State<CartScreen> {
                                                 ),
                                               ),
                                               _quantityButton(
+                                                context,
                                                 Icons.add_rounded,
                                                 () {
                                                   if (maxStock != null &&
@@ -303,10 +425,25 @@ class _CartScreenState extends State<CartScreen> {
                                               ),
                                             ],
                                           ),
+                                          if (maxStock != null) ...[
+                                            const SizedBox(height: 6),
+                                            Text(
+                                              'Доступно на складе: $maxStock шт',
+                                              style: TextStyle(
+                                                color:
+                                                    Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurfaceVariant,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ],
                                         ],
                                       ),
                                     ),
                                     IconButton(
+                                      tooltip: 'Удалить из корзины',
                                       onPressed: () {
                                         CartProvider.instance.removeItem(index);
                                       },
@@ -329,7 +466,7 @@ class _CartScreenState extends State<CartScreen> {
                               BoxShadow(
                                 blurRadius: 12,
                                 offset: const Offset(0, -4),
-                                color: Colors.black.withOpacity(0.04),
+                                color: Colors.black.withValues(alpha: 0.04),
                               ),
                             ],
                           ),
@@ -340,7 +477,7 @@ class _CartScreenState extends State<CartScreen> {
                                 Row(
                                   children: [
                                     Text(
-                                      'Итого',
+                                      '${CartProvider.instance.itemCount} товаров',
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w700,

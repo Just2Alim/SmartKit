@@ -17,6 +17,7 @@ class _MedicineDetailScreenState extends State<MedicineDetailScreen> {
   final MedicineRepository _repository = MedicineRepository();
   final FamilyRepository _familyRepository = FamilyRepository();
   bool isDeleting = false;
+  bool isRecordingIntake = false;
 
   Future<String> _getOwnerLabel(MedicineModel medicine) async {
     if (medicine.familyMemberId == null) {
@@ -90,6 +91,40 @@ class _MedicineDetailScreenState extends State<MedicineDetailScreen> {
     return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
   }
 
+  String _formatDateTime(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '$day.$month.${date.year} $hour:$minute';
+  }
+
+  Future<void> _recordIntake(MedicineModel medicine) async {
+    if (medicine.quantity <= 0) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Остаток уже нулевой')));
+      return;
+    }
+
+    setState(() => isRecordingIntake = true);
+    try {
+      final result = await _repository.recordIntake(medicineId: medicine.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Принято. Осталось ${result.quantityAfter}')),
+      );
+      setState(() {});
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Ошибка приема: $e')));
+    } finally {
+      if (mounted) setState(() => isRecordingIntake = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -159,7 +194,9 @@ class _MedicineDetailScreenState extends State<MedicineDetailScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        medicine.dosage,
+                        medicine.dosage.trim().isEmpty
+                            ? medicine.category
+                            : medicine.dosage,
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.white.withValues(alpha: 0.92),
@@ -171,6 +208,36 @@ class _MedicineDetailScreenState extends State<MedicineDetailScreen> {
 
                 const SizedBox(height: 24),
 
+                SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: FilledButton.icon(
+                    onPressed:
+                        medicine.quantity <= 0 || isRecordingIntake
+                            ? null
+                            : () => _recordIntake(medicine),
+                    icon:
+                        isRecordingIntake
+                            ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                            : const Icon(Icons.check_circle_rounded),
+                    label: Text(
+                      medicine.quantity <= 0
+                          ? 'Нет остатка'
+                          : 'Принял (-1 ${medicine.unitLabel})',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
                 FutureBuilder<String>(
                   future: _getOwnerLabel(medicine),
                   builder: (context, ownerSnapshot) {
@@ -181,11 +248,24 @@ class _MedicineDetailScreenState extends State<MedicineDetailScreen> {
                       children: [
                         _infoRow('Владелец', ownerLabel),
                         _infoRow('Категория', medicine.category),
-                        _infoRow('Количество', '${medicine.quantity} шт'),
+                        if ((medicine.form ?? '').isNotEmpty)
+                          _infoRow('Форма', medicine.form!),
+                        _infoRow(
+                          'Количество',
+                          '${medicine.quantity} ${medicine.unitLabel}',
+                        ),
+                        _infoRow(
+                          'Мин. остаток',
+                          '${medicine.lowStockThreshold} ${medicine.unitLabel}',
+                        ),
                         _infoRow(
                           'Срок годности',
                           _formatDate(medicine.expiryDate),
                         ),
+                        if ((medicine.storagePlace ?? '').isNotEmpty)
+                          _infoRow('Место хранения', medicine.storagePlace!),
+                        if (medicine.openedAt != null)
+                          _infoRow('Вскрыто', _formatDate(medicine.openedAt)),
                       ],
                     );
                   },
@@ -215,6 +295,10 @@ class _MedicineDetailScreenState extends State<MedicineDetailScreen> {
                     _infoRow('Создано', _formatDate(medicine.createdAt)),
                   ],
                 ),
+
+                const SizedBox(height: 16),
+
+                _intakeHistoryCard(medicine),
 
                 const SizedBox(height: 28),
                 SizedBox(
@@ -309,6 +393,43 @@ class _MedicineDetailScreenState extends State<MedicineDetailScreen> {
           ...children,
         ],
       ),
+    );
+  }
+
+  Widget _intakeHistoryCard(MedicineModel medicine) {
+    return StreamBuilder(
+      stream: _repository.getIntakeLogsByMedicine(medicine.id),
+      builder: (context, snapshot) {
+        final logs = snapshot.data ?? [];
+
+        return _infoCard(
+          title: 'История приема',
+          children: [
+            if (snapshot.connectionState == ConnectionState.waiting)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: LinearProgressIndicator(),
+              )
+            else if (logs.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  'Приемы пока не отмечались',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              )
+            else
+              ...logs.take(5).map((log) {
+                return _infoRow(
+                  _formatDateTime(log.takenAt),
+                  '-${log.amount} ${medicine.unitLabel}',
+                );
+              }),
+          ],
+        );
+      },
     );
   }
 

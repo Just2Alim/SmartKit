@@ -80,6 +80,47 @@ class _B2BSettingsScreenState extends State<B2BSettingsScreen> {
             padding: const EdgeInsets.all(20),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
+                _sectionTitle('Быстрый доступ'),
+                const SizedBox(height: 16),
+                _navCard(
+                  icon: Icons.warehouse_rounded,
+                  title: 'Локации склада',
+                  subtitle: 'Полки, зоны хранения и заполненность',
+                  onTap:
+                      () =>
+                          Navigator.pushNamed(context, AppRoutes.b2bLocations),
+                ),
+                const SizedBox(height: 12),
+                _navCard(
+                  icon: Icons.group_rounded,
+                  title: 'Команда',
+                  subtitle: 'Сотрудники, роли доступа и приглашения',
+                  onTap: () => Navigator.pushNamed(context, AppRoutes.b2bTeam),
+                ),
+                const SizedBox(height: 12),
+                _navCard(
+                  icon: Icons.notifications_active_rounded,
+                  title: 'Оповещения',
+                  subtitle: 'Сроки годности, низкий остаток и риски склада',
+                  onTap:
+                      () => Navigator.pushNamed(
+                        context,
+                        AppRoutes.b2bNotifications,
+                      ),
+                ),
+                const SizedBox(height: 12),
+                _navCard(
+                  icon: Icons.history_edu_rounded,
+                  title: 'История действий',
+                  subtitle: 'Продажи, приёмки, изменения товаров и локаций',
+                  onTap:
+                      () => Navigator.pushNamed(
+                        context,
+                        AppRoutes.b2bActivityHistory,
+                      ),
+                ),
+
+                const SizedBox(height: 32),
                 _sectionTitle('Уведомления'),
                 const SizedBox(height: 16),
                 _switchCard(
@@ -112,17 +153,16 @@ class _B2BSettingsScreenState extends State<B2BSettingsScreen> {
                 _sectionTitle('Управление'),
                 const SizedBox(height: 16),
                 _navCard(
-                  icon: Icons.group_rounded,
-                  title: 'Команда',
-                  subtitle: 'Сотрудники и роли доступа',
-                  onTap: () => Navigator.pushNamed(context, AppRoutes.b2bTeam),
-                ),
-                const SizedBox(height: 12),
-                _navCard(
                   icon: Icons.store_rounded,
                   title: 'Информация о аптеке',
                   subtitle: 'Адрес, контакты и реквизиты',
-                  onTap: () {},
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Раздел информации об аптеке в работе'),
+                      ),
+                    );
+                  },
                 ),
 
                 const SizedBox(height: 48),
@@ -167,7 +207,7 @@ class _B2BSettingsScreenState extends State<B2BSettingsScreen> {
       flexibleSpace: FlexibleSpaceBar(
         titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
         title: const Text(
-          'Настройки бизнеса',
+          'Ещё и настройки',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.w900,
@@ -257,7 +297,8 @@ class _B2BSettingsScreenState extends State<B2BSettingsScreen> {
             ),
           ),
           Switch.adaptive(
-            activeColor: const Color(0xFF10B981),
+            activeThumbColor: const Color(0xFF10B981),
+            activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.32),
             value: value,
             onChanged: onChanged,
           ),

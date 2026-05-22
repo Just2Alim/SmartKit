@@ -19,6 +19,59 @@ class FamilyMemberMedicinesScreen extends StatelessWidget {
     return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
   }
 
+  Future<void> _recordIntake(
+    BuildContext context,
+    MedicineModel medicine,
+  ) async {
+    if (medicine.quantity <= 0) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Остаток уже нулевой')));
+      return;
+    }
+
+    try {
+      final result = await _medicineRepository.recordIntake(
+        medicineId: medicine.id,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Принято. Осталось ${result.quantityAfter}')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Не удалось отметить прием: $e')));
+    }
+  }
+
+  Color _accentFor(MedicineModel medicine) {
+    final now = DateTime.now();
+    if (medicine.expiryDate != null) {
+      final days = medicine.expiryDate!.difference(now).inDays;
+      if (days >= 0 && days <= 30) return const Color(0xFFDC2626);
+    }
+    if (medicine.quantity <= medicine.lowStockThreshold) {
+      return const Color(0xFFEA580C);
+    }
+    return const Color(0xFF2563EB);
+  }
+
+  IconData _iconFor(MedicineModel medicine) {
+    final form = (medicine.form ?? medicine.category).toLowerCase();
+    if (form.contains('сироп') || form.contains('капли')) {
+      return Icons.local_drink_rounded;
+    }
+    if (form.contains('наруж') ||
+        form.contains('маз') ||
+        form.contains('гель')) {
+      return Icons.spa_rounded;
+    }
+    if (form.contains('спрей')) return Icons.air_rounded;
+    return Icons.medication_rounded;
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
@@ -171,6 +224,12 @@ class FamilyMemberMedicinesScreen extends StatelessWidget {
                                   (_, __) => const SizedBox(height: 12),
                               itemBuilder: (context, index) {
                                 final medicine = medicines[index];
+                                final accent = _accentFor(medicine);
+                                final dosage = medicine.dosage.trim();
+                                final unit =
+                                    medicine.unitLabel.isEmpty
+                                        ? 'шт'
+                                        : medicine.unitLabel;
 
                                 return InkWell(
                                   onTap: () {
@@ -186,6 +245,9 @@ class FamilyMemberMedicinesScreen extends StatelessWidget {
                                     decoration: BoxDecoration(
                                       color: Theme.of(context).cardColor,
                                       borderRadius: BorderRadius.circular(24),
+                                      border: Border.all(
+                                        color: accent.withValues(alpha: 0.14),
+                                      ),
                                       boxShadow: [
                                         BoxShadow(
                                           blurRadius: 10,
@@ -212,11 +274,8 @@ class FamilyMemberMedicinesScreen extends StatelessWidget {
                                             ),
                                           ),
                                           child: Icon(
-                                            Icons.medication_rounded,
-                                            color:
-                                                Theme.of(
-                                                  context,
-                                                ).colorScheme.primary,
+                                            _iconFor(medicine),
+                                            color: accent,
                                           ),
                                         ),
                                         const SizedBox(width: 14),
@@ -238,7 +297,9 @@ class FamilyMemberMedicinesScreen extends StatelessWidget {
                                               ),
                                               const SizedBox(height: 4),
                                               Text(
-                                                '${medicine.dosage} • ${medicine.category}',
+                                                dosage.isEmpty
+                                                    ? medicine.category
+                                                    : '$dosage • ${medicine.category}',
                                                 style: TextStyle(
                                                   fontSize: 13,
                                                   color:
@@ -249,44 +310,70 @@ class FamilyMemberMedicinesScreen extends StatelessWidget {
                                               ),
                                               const SizedBox(height: 6),
                                               Text(
-                                                'Срок: ${_formatDate(medicine.expiryDate)}',
+                                                [
+                                                  'Срок: ${_formatDate(medicine.expiryDate)}',
+                                                  if ((medicine.storagePlace ??
+                                                          '')
+                                                      .isNotEmpty)
+                                                    medicine.storagePlace!,
+                                                ].join(' • '),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
                                                   fontSize: 12,
                                                   fontWeight: FontWeight.w700,
-                                                  color:
-                                                      Theme.of(
-                                                        context,
-                                                      ).colorScheme.primary,
+                                                  color: accent,
                                                 ),
                                               ),
                                             ],
                                           ),
                                         ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 10,
-                                            vertical: 6,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color:
-                                                Theme.of(context)
-                                                    .colorScheme
-                                                    .surfaceContainerHighest,
-                                            borderRadius: BorderRadius.circular(
-                                              999,
+                                        const SizedBox(width: 10),
+                                        Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 6,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: accent.withValues(
+                                                  alpha: 0.12,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(999),
+                                              ),
+                                              child: Text(
+                                                '${medicine.quantity} $unit',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: accent,
+                                                ),
+                                              ),
                                             ),
-                                          ),
-                                          child: Text(
-                                            '${medicine.quantity} шт',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w700,
-                                              color:
-                                                  Theme.of(
-                                                    context,
-                                                  ).colorScheme.onSurface,
+                                            const SizedBox(height: 8),
+                                            Tooltip(
+                                              message: 'Отметить прием',
+                                              child: IconButton.filledTonal(
+                                                visualDensity:
+                                                    VisualDensity.compact,
+                                                onPressed:
+                                                    medicine.quantity <= 0
+                                                        ? null
+                                                        : () => _recordIntake(
+                                                          context,
+                                                          medicine,
+                                                        ),
+                                                icon: const Icon(
+                                                  Icons.check_rounded,
+                                                  size: 18,
+                                                ),
+                                              ),
                                             ),
-                                          ),
+                                          ],
                                         ),
                                       ],
                                     ),

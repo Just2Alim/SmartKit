@@ -68,21 +68,7 @@ class DashboardScreen extends StatelessWidget {
                 context: context,
                 title: 'Мои лекарства',
                 actionText: 'Добавить',
-                onTap: () async {
-                  final result = await Navigator.pushNamed(
-                    context,
-                    AppRoutes.scanBarcode,
-                  );
-                  if (result != null && result is Map<String, dynamic>) {
-                    if (!context.mounted) return;
-                    Navigator.pushNamed(
-                      context,
-                      AppRoutes.addMedicine,
-                      arguments:
-                          result['manual'] == true ? {'name': ''} : result,
-                    );
-                  }
-                },
+                onTap: () => _showAddMedicineSelection(context),
               ),
               const SizedBox(height: 12),
               _buildMedicinesSection(context),
@@ -240,7 +226,7 @@ class DashboardScreen extends StatelessWidget {
 
             final lowStockCount =
                 medicines.where((medicine) {
-                  return medicine.quantity <= 5;
+                  return medicine.quantity <= medicine.lowStockThreshold;
                 }).length +
                 b2bItems.where((item) => item.stock <= 5).length;
 
@@ -491,18 +477,7 @@ class DashboardScreen extends StatelessWidget {
         return InkWell(
           onTap: () async {
             if (item.$5 == AppRoutes.addMedicine) {
-              final result = await Navigator.pushNamed(
-                context,
-                AppRoutes.scanBarcode,
-              );
-              if (result != null && result is Map<String, dynamic>) {
-                if (!context.mounted) return;
-                Navigator.pushNamed(
-                  context,
-                  AppRoutes.addMedicine,
-                  arguments: result['manual'] == true ? {'name': ''} : result,
-                );
-              }
+              _showAddMedicineSelection(context);
             } else {
               Navigator.pushNamed(context, item.$5);
             }
@@ -646,7 +621,7 @@ class DashboardScreen extends StatelessWidget {
 
             final lowStockMedicines =
                 medicines.where((medicine) {
-                  return medicine.quantity <= 5;
+                  return medicine.quantity <= medicine.lowStockThreshold;
                 }).toList();
 
             final b2bLowStock =
@@ -878,110 +853,238 @@ class DashboardScreen extends StatelessWidget {
           );
         }
 
-        return Column(
-          children:
-              medicines.take(3).map((medicine) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.pushNamed(
-                        context,
-                        AppRoutes.medicineDetail,
-                        arguments: medicine.id,
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(24),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).cardColor,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                            color: Colors.black.withOpacity(0.04),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              color:
-                                  Theme.of(context).brightness ==
-                                          Brightness.dark
-                                      ? const Color(0xFF1E3A8A).withOpacity(0.3)
-                                      : const Color(0xFFDBEAFE),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Icon(
-                              Icons.medication_rounded,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  medicine.name,
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w800,
-                                    color:
-                                        Theme.of(context).colorScheme.onSurface,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${medicine.dosage} • ${medicine.category}',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color:
-                                        Theme.of(
-                                          context,
-                                        ).colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color:
-                                  Theme.of(
-                                    context,
-                                  ).colorScheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              '${medicine.quantity} шт',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: Theme.of(context).colorScheme.onSurface,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-        );
+        return _buildMedicineCabinet(context, medicines.take(6).toList());
       },
     );
+  }
+
+  Widget _buildMedicineCabinet(
+    BuildContext context,
+    List<MedicineModel> medicines,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(Icons.inventory_2_rounded, color: colorScheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Мини-аптечка',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ),
+              Text(
+                '${medicines.length}',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          GridView.builder(
+            itemCount: medicines.length,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 0.9,
+            ),
+            itemBuilder: (context, index) {
+              return _medicineCabinetTile(context, medicines[index]);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _medicineCabinetTile(BuildContext context, MedicineModel medicine) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final accent = _medicineAccent(context, medicine);
+    final unit = medicine.unitLabel.isEmpty ? 'шт' : medicine.unitLabel;
+    final dosage = medicine.dosage.trim();
+
+    return InkWell(
+      onTap: () {
+        Navigator.pushNamed(
+          context,
+          AppRoutes.medicineDetail,
+          arguments: medicine.id,
+        );
+      },
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: accent.withValues(alpha: 0.16)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Icon(_medicineIcon(medicine), color: accent, size: 21),
+                ),
+                const Spacer(),
+                Tooltip(
+                  message: 'Отметить прием',
+                  child: IconButton.filledTonal(
+                    visualDensity: VisualDensity.compact,
+                    onPressed:
+                        medicine.quantity <= 0
+                            ? null
+                            : () => _recordIntake(context, medicine),
+                    icon: const Icon(Icons.check_rounded, size: 18),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              medicine.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              dosage.isEmpty
+                  ? medicine.category
+                  : '$dosage • ${medicine.category}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const Spacer(),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    medicine.storagePlace?.isNotEmpty == true
+                        ? medicine.storagePlace!
+                        : 'Аптечка',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '${medicine.quantity} $unit',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: accent,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _recordIntake(
+    BuildContext context,
+    MedicineModel medicine,
+  ) async {
+    if (medicine.quantity <= 0) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Остаток уже нулевой')));
+      return;
+    }
+
+    try {
+      final result = await _medicineRepository.recordIntake(
+        medicineId: medicine.id,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Принято. Осталось ${result.quantityAfter}')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Не удалось отметить прием: $e')));
+    }
+  }
+
+  Color _medicineAccent(BuildContext context, MedicineModel medicine) {
+    final now = DateTime.now();
+    if (medicine.expiryDate != null) {
+      final days = medicine.expiryDate!.difference(now).inDays;
+      if (days >= 0 && days <= 30) return const Color(0xFFDC2626);
+    }
+    if (medicine.quantity <= medicine.lowStockThreshold) {
+      return const Color(0xFFEA580C);
+    }
+    return Theme.of(context).colorScheme.primary;
+  }
+
+  IconData _medicineIcon(MedicineModel medicine) {
+    final form = (medicine.form ?? medicine.category).toLowerCase();
+    if (form.contains('сироп') || form.contains('капли')) {
+      return Icons.local_drink_rounded;
+    }
+    if (form.contains('наруж') ||
+        form.contains('маз') ||
+        form.contains('гель')) {
+      return Icons.spa_rounded;
+    }
+    if (form.contains('спрей')) return Icons.air_rounded;
+    return Icons.medication_rounded;
   }
 
   Widget _buildAiCard(BuildContext context) {
@@ -1058,6 +1161,7 @@ class DashboardScreen extends StatelessWidget {
   }
 
   void _showAddMedicineSelection(BuildContext context) {
+    final rootContext = context;
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -1087,9 +1191,21 @@ class DashboardScreen extends StatelessWidget {
                         subtitle: 'Штрих-код',
                         icon: Icons.qr_code_scanner_rounded,
                         color: const Color(0xFF2563EB),
-                        onTap: () {
+                        onTap: () async {
                           Navigator.pop(context);
-                          Navigator.pushNamed(context, AppRoutes.scanBarcode);
+                          final result = await Navigator.pushNamed(
+                            rootContext,
+                            AppRoutes.scanBarcode,
+                          );
+                          if (!rootContext.mounted) return;
+                          Navigator.pushNamed(
+                            rootContext,
+                            AppRoutes.addMedicine,
+                            arguments:
+                                result is Map<String, dynamic>
+                                    ? result
+                                    : {'name': ''},
+                          );
                         },
                       ),
                     ),
@@ -1103,11 +1219,31 @@ class DashboardScreen extends StatelessWidget {
                         color: const Color(0xFF16A34A),
                         onTap: () {
                           Navigator.pop(context);
-                          Navigator.pushNamed(context, AppRoutes.addMedicine);
+                          Navigator.pushNamed(
+                            rootContext,
+                            AppRoutes.addMedicine,
+                            arguments: {'name': ''},
+                          );
                         },
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 16),
+                _selectionCard(
+                  context: context,
+                  title: 'Списком',
+                  subtitle: 'Несколько строк',
+                  icon: Icons.playlist_add_rounded,
+                  color: const Color(0xFFEA580C),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.pushNamed(
+                      rootContext,
+                      AppRoutes.addMedicine,
+                      arguments: {'name': '', 'openBulk': true},
+                    );
+                  },
                 ),
               ],
             ),

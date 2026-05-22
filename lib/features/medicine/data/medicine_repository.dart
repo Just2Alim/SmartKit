@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/medicine_intake_log_model.dart';
 import '../models/medicine_model.dart';
 
 class MedicineRepository {
@@ -7,6 +8,13 @@ class MedicineRepository {
 
   Future<void> addMedicine(MedicineModel medicine) async {
     await _client.from('medicines').insert(medicine.toMap());
+  }
+
+  Future<void> addMedicines(List<MedicineModel> medicines) async {
+    if (medicines.isEmpty) return;
+    await _client
+        .from('medicines')
+        .insert(medicines.map((medicine) => medicine.toMap()).toList());
   }
 
   Stream<List<MedicineModel>> getMedicinesByUser(String userId) {
@@ -66,6 +74,12 @@ class MedicineRepository {
     String? packageSize,
     String? batchNumber,
     String? scanSource,
+    String? form,
+    String unitLabel = 'шт',
+    String? storagePlace,
+    int lowStockThreshold = 3,
+    int? initialQuantity,
+    DateTime? openedAt,
   }) async {
     final updates = <String, dynamic>{
       'name': name,
@@ -75,6 +89,12 @@ class MedicineRepository {
       'notes': notes,
       'family_member_id': familyMemberId,
       'expiry_date': expiryDate?.toIso8601String(),
+      'form': form,
+      'unit_label': unitLabel,
+      'storage_place': storagePlace,
+      'low_stock_threshold': lowStockThreshold,
+      'initial_quantity': initialQuantity ?? quantity,
+      'opened_at': openedAt?.toIso8601String(),
     };
 
     if (barcode != null) updates['barcode'] = barcode;
@@ -84,6 +104,34 @@ class MedicineRepository {
     if (scanSource != null) updates['scan_source'] = scanSource;
 
     await _client.from('medicines').update(updates).eq('id', medicineId);
+  }
+
+  Future<MedicineIntakeResult> recordIntake({
+    required String medicineId,
+    int amount = 1,
+    String? note,
+  }) async {
+    final data = await _client.rpc(
+      'record_medicine_intake',
+      params: {'p_medicine_id': medicineId, 'p_amount': amount, 'p_note': note},
+    );
+
+    return MedicineIntakeResult.fromMap(Map<String, dynamic>.from(data as Map));
+  }
+
+  Stream<List<MedicineIntakeLogModel>> getIntakeLogsByMedicine(
+    String medicineId,
+  ) {
+    return _client
+        .from('medicine_intake_logs')
+        .stream(primaryKey: ['id'])
+        .eq('medicine_id', medicineId)
+        .order('taken_at', ascending: false)
+        .map(
+          (rows) =>
+              rows.map((row) => MedicineIntakeLogModel.fromMap(row)).toList()
+                ..sort((a, b) => b.takenAt.compareTo(a.takenAt)),
+        );
   }
 
   Future<void> deleteMedicine(String medicineId) async {
@@ -110,7 +158,13 @@ class MedicineRepository {
   }) {
     return getMedicinesByUser(userId).map((medicines) {
       return medicines
-          .where((medicine) => medicine.quantity <= threshold)
+          .where(
+            (medicine) =>
+                medicine.quantity <=
+                (medicine.lowStockThreshold > 0
+                    ? medicine.lowStockThreshold
+                    : threshold),
+          )
           .toList();
     });
   }

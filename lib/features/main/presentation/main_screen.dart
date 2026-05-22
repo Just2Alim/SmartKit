@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import '../../dashboard/presentation/dashboard_screen.dart';
-import '../../medicine/presentation/search_screen.dart';
-import '../../family/presentation/family_screen.dart';
-import '../../shop/presentation/shop_screen.dart';
-import '../../profile/presentation/profile_screen.dart';
+
+import '../../../core/state/cart_provider.dart';
 import '../../../core/widgets/bottom_nav_bar.dart';
+import '../../dashboard/presentation/dashboard_screen.dart';
+import '../../family/presentation/family_screen.dart';
+import '../../medicine/presentation/search_screen.dart';
+import '../../profile/presentation/profile_screen.dart';
+import '../../shop/presentation/shop_screen.dart';
 
 class MainScreen extends StatefulWidget {
   final int initialIndex;
@@ -42,13 +44,16 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
-      bottomNavigationBar: AppBottomNavBar(
-        currentIndex: _currentIndex,
-        onTap: _onTabTapped,
+      body: IndexedStack(index: _currentIndex, children: _screens),
+      bottomNavigationBar: ListenableBuilder(
+        listenable: CartProvider.instance,
+        builder: (context, _) {
+          return AppBottomNavBar(
+            currentIndex: _currentIndex,
+            onTap: _onTabTapped,
+            badgeCounts: {3: CartProvider.instance.itemCount},
+          );
+        },
       ),
     );
   }

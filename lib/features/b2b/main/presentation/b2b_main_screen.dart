@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/bottom_nav_bar.dart';
 import '../../inventory/presentation/b2b_dashboard_screen.dart';
 import '../../inventory/presentation/b2b_inventory_screen.dart';
 import '../../inventory/presentation/b2b_sales_history_screen.dart';
@@ -31,96 +32,39 @@ class _B2BMainScreenState extends State<B2BMainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     return Scaffold(
       body: IndexedStack(index: _selectedIndex, children: _screens),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: theme.cardColor,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(
-                alpha: theme.brightness == Brightness.dark ? 0.28 : 0.06,
-              ),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: BottomNavigationBar(
-                currentIndex: _selectedIndex,
-                onTap: _onItemTapped,
-                type: BottomNavigationBarType.fixed,
-                backgroundColor: theme.cardColor,
-                selectedItemColor: scheme.primary,
-                unselectedItemColor: scheme.onSurfaceVariant,
-                showSelectedLabels: true,
-                showUnselectedLabels: true,
-                selectedLabelStyle: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
-                  letterSpacing: 0,
-                ),
-                unselectedLabelStyle: const TextStyle(
-                  fontWeight: FontWeight.w500,
-                  fontSize: 11,
-                  letterSpacing: 0,
-                ),
-                elevation: 0,
-                items: [
-                  _navItem(Icons.home_rounded, Icons.home_filled, 'Главная', 0),
-                  _navItem(
-                    Icons.inventory_2_outlined,
-                    Icons.inventory_2_rounded,
-                    'Склад',
-                    1,
-                  ),
-                  _navItem(
-                    Icons.history_outlined,
-                    Icons.history_rounded,
-                    'Продажи',
-                    2,
-                  ),
-                  _navItem(
-                    Icons.analytics_outlined,
-                    Icons.analytics_rounded,
-                    'Отчёты',
-                    3,
-                  ),
-                  _navItem(
-                    Icons.settings_outlined,
-                    Icons.settings_rounded,
-                    'Настройки',
-                    4,
-                  ),
-                ],
-              ),
-            ),
+      bottomNavigationBar: AppBottomNavBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        items: const [
+          AppNavItem(
+            icon: Icons.home_outlined,
+            activeIcon: Icons.home_rounded,
+            label: 'Главная',
           ),
-        ),
+          AppNavItem(
+            icon: Icons.inventory_2_outlined,
+            activeIcon: Icons.inventory_2_rounded,
+            label: 'Склад',
+          ),
+          AppNavItem(
+            icon: Icons.receipt_long_outlined,
+            activeIcon: Icons.receipt_long_rounded,
+            label: 'Продажи',
+          ),
+          AppNavItem(
+            icon: Icons.analytics_outlined,
+            activeIcon: Icons.analytics_rounded,
+            label: 'Отчёты',
+          ),
+          AppNavItem(
+            icon: Icons.widgets_outlined,
+            activeIcon: Icons.widgets_rounded,
+            label: 'Ещё',
+          ),
+        ],
       ),
-    );
-  }
-
-  BottomNavigationBarItem _navItem(
-    IconData icon,
-    IconData activeIcon,
-    String label,
-    int index,
-  ) {
-    final isSelected = _selectedIndex == index;
-    return BottomNavigationBarItem(
-      icon: Padding(
-        padding: const EdgeInsets.only(bottom: 4),
-        child: Icon(isSelected ? activeIcon : icon, size: 26),
-      ),
-      label: label,
     );
   }
 }

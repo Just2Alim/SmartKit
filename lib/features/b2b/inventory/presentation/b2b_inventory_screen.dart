@@ -175,7 +175,7 @@ class B2BInventoryScreen extends StatelessWidget {
                 child: Icon(
                   Icons.inventory_2_rounded,
                   size: 140,
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ],
@@ -284,7 +284,7 @@ class B2BInventoryScreen extends StatelessWidget {
                       width: 64,
                       height: 64,
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.1),
+                        color: statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Icon(
@@ -300,6 +300,8 @@ class B2BInventoryScreen extends StatelessWidget {
                         children: [
                           Text(
                             item.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w900,
@@ -342,35 +344,51 @@ class B2BInventoryScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         _statusTag(item),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              onPressed: () {
-                                Navigator.pushNamed(
-                                  context,
-                                  AppRoutes.b2bAddMedicine,
-                                  arguments: item.id,
-                                );
-                              },
-                              icon: const Icon(
-                                Icons.edit_outlined,
-                                color: Color(0xFF10B981),
-                                size: 22,
-                              ),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                            IconButton(
-                              onPressed: () => _deleteItem(context, item),
-                              icon: const Icon(
-                                Icons.delete_outline_rounded,
-                                color: Color(0xFF94A3B8),
-                                size: 22,
-                              ),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ],
+                        PopupMenuButton<String>(
+                          tooltip: 'Действия с товаром',
+                          icon: Icon(
+                            Icons.more_horiz_rounded,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                          onSelected: (value) {
+                            if (value == 'edit') {
+                              Navigator.pushNamed(
+                                context,
+                                AppRoutes.b2bAddMedicine,
+                                arguments: item.id,
+                              );
+                            }
+                            if (value == 'delete') {
+                              _deleteItem(context, item);
+                            }
+                          },
+                          itemBuilder:
+                              (context) => const [
+                                PopupMenuItem(
+                                  value: 'edit',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.edit_outlined),
+                                      SizedBox(width: 10),
+                                      Text('Редактировать'),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.delete_outline_rounded,
+                                        color: Color(0xFFDC2626),
+                                      ),
+                                      SizedBox(width: 10),
+                                      Text('Удалить'),
+                                    ],
+                                  ),
+                                ),
+                              ],
                         ),
                       ],
                     ),
@@ -388,7 +406,7 @@ class B2BInventoryScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
@@ -408,7 +426,7 @@ class B2BInventoryScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Text(

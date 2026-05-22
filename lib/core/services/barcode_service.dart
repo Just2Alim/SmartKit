@@ -4,19 +4,30 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../features/medicine/domain/gs1_barcode_parser.dart';
+
 class BarcodeService {
   static const String _openFoodFactsApiUrl =
       'https://world.openfoodfacts.org/api/v2/product/';
   static const String _openProductsFactsApiUrl =
       'https://world.openproductsfacts.org/api/v2/product/';
   static const String _openFdaApiUrl = 'https://api.fda.gov/drug/label.json';
+  static const String _dailyMedSplsApiUrl =
+      'https://dailymed.nlm.nih.gov/dailymed/services/v2/spls.json';
+  static const String _rxNormDrugsApiUrl =
+      'https://rxnav.nlm.nih.gov/REST/drugs.json';
 
   static SupabaseClient get _client => Supabase.instance.client;
 
   /// Возвращает черновик лекарства всегда, даже если внешний справочник ничего
   /// не знает о коде. Так UI не упирается в ошибку "не найдено".
   static Future<Map<String, dynamic>?> lookupBarcode(String barcode) async {
-    final normalizedBarcode = _normalizeBarcode(barcode);
+    final gs1Data = Gs1BarcodeParser.parse(barcode);
+    final lookupValue =
+        gs1Data?['gtin']?.toString() ??
+        gs1Data?['barcode']?.toString() ??
+        barcode;
+    final normalizedBarcode = _normalizeBarcode(lookupValue);
     if (!_looksLikeBarcode(normalizedBarcode)) return null;
 
     try {
@@ -33,23 +44,35 @@ class BarcodeService {
       for (final source in sources) {
         final result = await source();
         if (result == null) continue;
+        final enriched = await _enrichDrugReference(result);
+        final merged = _mergeScanData(enriched, gs1Data);
         return _withDefaults(
           normalizedBarcode,
-          result,
-          needsPackageScan: _needsPackageScan(result),
+          merged,
+          needsPackageScan: _needsPackageScan(merged),
         );
       }
 
       final localResult = _lookupLocalDatabase(normalizedBarcode);
       if (localResult != null) {
+        final enriched = await _enrichDrugReference(localResult);
+        final merged = _mergeScanData(enriched, gs1Data);
         return _withDefaults(
           normalizedBarcode,
-          localResult,
-          needsPackageScan: _needsPackageScan(localResult),
+          merged,
+          needsPackageScan: _needsPackageScan(merged),
         );
       }
     } catch (e) {
       debugPrint('Barcode lookup error: $e');
+    }
+
+    if (gs1Data != null) {
+      return _withDefaults(
+        normalizedBarcode,
+        gs1Data,
+        needsPackageScan: _needsPackageScan(gs1Data),
+      );
     }
 
     return _unknownDraft(normalizedBarcode);
@@ -262,6 +285,111 @@ class BarcodeService {
     return null;
   }
 
+  static Future<Map<String, dynamic>> _enrichDrugReference(
+    Map<String, dynamic> base,
+  ) async {
+    final name = _nonEmpty(base['name']);
+    if (name == null) return base;
+
+    try {
+      final references = await Future.wait([
+        _lookupDailyMedByName(name),
+        _lookupRxNormByName(name),
+      ]);
+
+      var merged = Map<String, dynamic>.from(base);
+      for (final reference in references) {
+        if (reference == null) continue;
+        merged = _mergeReferenceData(merged, reference);
+      }
+      return merged;
+    } catch (_) {
+      return base;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> _lookupDailyMedByName(
+    String name,
+  ) async {
+    try {
+      final uri = Uri.parse(
+        _dailyMedSplsApiUrl,
+      ).replace(queryParameters: {'drug_name': name, 'pagesize': '1'});
+      final response = await http.get(uri).timeout(const Duration(seconds: 5));
+      if (response.statusCode != 200) return null;
+
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      final rows = data['data'];
+      if (rows is! List || rows.isEmpty || rows.first is! Map) return null;
+
+      final item = (rows.first as Map).cast<String, dynamic>();
+      final title = _firstNonEmpty([
+        item['title'],
+        item['spl_product_data_elements'],
+        item['published_date'],
+      ]);
+      final text = [
+        title,
+        item['dosage_form'],
+        item['marketing_category'],
+      ].whereType<Object>().join(' ');
+
+      return {
+        'name': _extractReadableName(title) ?? name,
+        'category': _mapCategory(text),
+        'dosage': _extractDosage(text),
+        'form': _firstNonEmpty([item['dosage_form']]),
+        'source': 'DailyMed',
+        'confidence': 0.7,
+      }..removeWhere((_, value) => value == null || value == '');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> _lookupRxNormByName(String name) async {
+    try {
+      final uri = Uri.parse(
+        _rxNormDrugsApiUrl,
+      ).replace(queryParameters: {'name': name});
+      final response = await http.get(uri).timeout(const Duration(seconds: 5));
+      if (response.statusCode != 200) return null;
+
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      final drugGroup = data['drugGroup'];
+      if (drugGroup is! Map) return null;
+
+      final conceptGroups = drugGroup['conceptGroup'];
+      if (conceptGroups is! List) return null;
+
+      Map<String, dynamic>? concept;
+      for (final group in conceptGroups) {
+        if (group is! Map) continue;
+        final properties = group['conceptProperties'];
+        if (properties is List && properties.isNotEmpty) {
+          concept = (properties.first as Map).cast<String, dynamic>();
+          break;
+        }
+      }
+
+      if (concept == null) return null;
+
+      final conceptName = _firstNonEmpty([concept['synonym'], concept['name']]);
+      final text = [conceptName, concept['tty']].whereType<Object>().join(' ');
+
+      return {
+        'name': conceptName ?? name,
+        'dosage': _extractDosage(text),
+        'category': _mapCategory(text),
+        'rxCui': _nonEmpty(concept['rxcui']),
+        'source': 'RxNorm',
+        'confidence': 0.72,
+      }..removeWhere((_, value) => value == null || value == '');
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Map<String, dynamic>? _lookupLocalDatabase(String barcode) {
     final localDb = <String, Map<String, dynamic>>{
       '4601669003515': {
@@ -387,6 +515,65 @@ class BarcodeService {
     return {...item, 'source': 'Local fallback', 'confidence': 0.7};
   }
 
+  static Map<String, dynamic> _mergeScanData(
+    Map<String, dynamic> base,
+    Map<String, dynamic>? scanData,
+  ) {
+    if (scanData == null) return base;
+
+    final merged = Map<String, dynamic>.from(base);
+    for (final entry in scanData.entries) {
+      final value = entry.value;
+      if (value == null || value.toString().trim().isEmpty) continue;
+
+      if (entry.key == 'source') {
+        merged['source'] = _combineSources(merged['source'], value);
+        continue;
+      }
+
+      final current = merged[entry.key];
+      if (current == null || current.toString().trim().isEmpty) {
+        merged[entry.key] = value;
+      } else if (entry.key == 'expiryDate' || entry.key == 'batchNumber') {
+        merged[entry.key] = value;
+      }
+    }
+
+    final scanMessage = _nonEmpty(scanData['lookupMessage']);
+    if (scanMessage != null) merged['lookupMessage'] = scanMessage;
+    return merged;
+  }
+
+  static Map<String, dynamic> _mergeReferenceData(
+    Map<String, dynamic> base,
+    Map<String, dynamic> reference,
+  ) {
+    final merged = Map<String, dynamic>.from(base);
+
+    for (final key in [
+      'category',
+      'dosage',
+      'form',
+      'rxCui',
+      'manufacturer',
+      'packageSize',
+    ]) {
+      final value = _nonEmpty(reference[key]);
+      final current = _nonEmpty(merged[key]);
+      if (value != null && current == null) merged[key] = value;
+    }
+
+    merged['source'] = _combineSources(merged['source'], reference['source']);
+    final confidence = reference['confidence'];
+    if (confidence is num) {
+      final current = merged['confidence'];
+      final currentNum = current is num ? current : 0;
+      merged['confidence'] = currentNum > confidence ? currentNum : confidence;
+    }
+
+    return merged;
+  }
+
   static Map<String, dynamic> _withDefaults(
     String barcode,
     Map<String, dynamic> data, {
@@ -406,9 +593,10 @@ class BarcodeService {
       'needsPackageScan': needsPackageScan,
       'isUnknown': name == null,
       'lookupMessage':
-          needsPackageScan
+          _nonEmpty(data['lookupMessage']) ??
+          (needsPackageScan
               ? 'Сканируйте упаковку, чтобы уточнить дозировку, срок годности и серию.'
-              : 'Данные найдены по штрих-коду.',
+              : 'Данные найдены по штрих-коду.'),
     };
   }
 
@@ -438,6 +626,46 @@ class BarcodeService {
 
   static bool _looksLikeBarcode(String barcode) {
     return RegExp(r'^[0-9A-Za-z]{6,32}$').hasMatch(barcode);
+  }
+
+  static String _combineSources(dynamic current, dynamic next) {
+    final values =
+        [_nonEmpty(current), _nonEmpty(next)]
+            .whereType<String>()
+            .expand((value) => value.split('+'))
+            .map((value) {
+              return value.trim();
+            })
+            .where((value) => value.isNotEmpty)
+            .toSet();
+
+    return values.join(' + ');
+  }
+
+  static String? _extractReadableName(String? title) {
+    final text = _nonEmpty(title);
+    if (text == null) return null;
+
+    final cleaned =
+        text
+            .replaceAll(
+              RegExp(
+                r'\b(?:tablet|capsule|solution|syrup|cream|gel|spray)s?\b',
+                caseSensitive: false,
+              ),
+              ' ',
+            )
+            .replaceAll(
+              RegExp(
+                r'\b\d+(?:[,.]\d+)?\s*(?:mg|mcg|g|ml|%)\b',
+                caseSensitive: false,
+              ),
+              ' ',
+            )
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .trim();
+
+    return cleaned.isEmpty ? text : cleaned;
   }
 
   static String? _nonEmpty(dynamic value) {
@@ -503,7 +731,7 @@ class BarcodeService {
   static String? _extractPackageSize(String? text) {
     if (text == null) return null;
     final match = RegExp(
-      r'\b(?:№|n|no\.?|x)?\s?\d{1,4}\s*(?:табл\.?|капс\.?|caps?|tablets?|амп\.?|флак\.?|саше|шт\.?|pcs?)\b',
+      r'(?:№\s?\d{1,4}|\b(?:n|no\.?|x)?\s?\d{1,4}\s*(?:табл\.?|капс\.?|caps?|tablets?|амп\.?|флак\.?|саше|шт\.?|pcs?)\b)',
       caseSensitive: false,
     ).firstMatch(text);
     return match?.group(0)?.trim();
