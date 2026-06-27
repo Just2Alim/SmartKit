@@ -53,6 +53,7 @@ set +a
 
 PORT=11500 \
 OLLAMA_BASE_URL=http://127.0.0.1:11434 \
+OLLAMA_PROXY_TOKEN=$OLLAMA_PROXY_TOKEN \
 node scripts/ollama_proxy.mjs
 ```
 
@@ -101,17 +102,12 @@ npx supabase functions deploy admin-dashboard \
 
 Проверка AI:
 
-```bash
-set -a
-source .env
-set +a
-
-curl "$SMARTKIT_API_BASE_URL/ai-chat" \
-  -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
-  -H "apikey: $SUPABASE_ANON_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"message":"Ответь коротко: Qwen3 работает?","temperature":0.25}'
-```
+Проверка `ai-chat` требует JWT вошедшего пользователя. `SUPABASE_ANON_KEY`
+подходит для PostgREST anon-запросов, но Edge Function проверяет пользователя
+через `supabase.auth.getUser(jwt)`, поэтому с anon key ответ будет
+`Invalid token`. Самый быстрый smoke-test: войти в web-приложение и отправить
+сообщение в SmartKit AI; если Qwen3 доступен, ответ не должен уходить в
+встроенный fallback.
 
 ## 5. Собрать и запустить web
 
@@ -201,6 +197,8 @@ cloudflared tunnel --url http://localhost:8090
 ## Чеклист перед отправкой ссылки
 
 - `ollama list` показывает `qwen3:latest`.
+- `scripts/ollama_proxy.mjs` проксирует именно `http://127.0.0.1:11434`, если
+  Ollama запущен стандартно на macOS.
 - Supabase secret `OLLAMA_MODEL` равен `qwen3:latest`.
 - `ai-chat` возвращает осмысленный ответ, а не пустую строку.
 - Web URL открывает экран SmartKit.

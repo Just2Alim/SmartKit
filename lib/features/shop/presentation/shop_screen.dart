@@ -4,6 +4,8 @@ import '../../../core/router/app_routes.dart';
 import '../../../core/state/cart_provider.dart';
 import '../../b2b/inventory/data/b2b_inventory_repository.dart';
 import '../../b2b/inventory/models/b2b_inventory_model.dart';
+import '../data/shop_repository.dart';
+import '../models/shop_order_model.dart';
 import '../utils/shop_product_mapper.dart';
 
 class ShopScreen extends StatefulWidget {
@@ -15,9 +17,17 @@ class ShopScreen extends StatefulWidget {
 
 class _ShopScreenState extends State<ShopScreen> {
   final B2BInventoryRepository _inventoryRepo = B2BInventoryRepository();
+  final ShopRepository _shopRepository = ShopRepository();
   final TextEditingController _searchController = TextEditingController();
 
   String _selectedCategory = 'Все';
+  late Future<ShopPersonalizationSignals> _signalsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _signalsFuture = _shopRepository.getPersonalizationSignals();
+  }
 
   @override
   void dispose() {
@@ -49,6 +59,35 @@ class _ShopScreenState extends State<ShopScreen> {
 
   Map<String, dynamic> _productMap(B2BInventoryModel product) {
     return ShopProductMapper.toProductMap(product);
+  }
+
+  List<B2BInventoryModel> _personalizedProducts(
+    List<B2BInventoryModel> products,
+    ShopPersonalizationSignals signals,
+  ) {
+    if (signals.categoryScores.isEmpty &&
+        signals.purchasedInventoryIds.isEmpty) {
+      return const [];
+    }
+
+    final scored = <({B2BInventoryModel product, int score})>[];
+    for (final product in products) {
+      if (product.stock <= 0) continue;
+      final categoryScore = signals.categoryScores[product.category] ?? 0;
+      final refillScore =
+          signals.purchasedInventoryIds.contains(product.id) ? 8 : 0;
+      final lowStockBoost = product.stock <= product.minStock ? -2 : 0;
+      final score = categoryScore * 3 + refillScore + lowStockBoost;
+      if (score > 0) scored.add((product: product, score: score));
+    }
+
+    scored.sort((a, b) {
+      final scoreCompare = b.score.compareTo(a.score);
+      if (scoreCompare != 0) return scoreCompare;
+      return a.product.name.compareTo(b.product.name);
+    });
+
+    return scored.map((item) => item.product).take(6).toList();
   }
 
   void _addToCart(BuildContext context, B2BInventoryModel product) {
@@ -114,6 +153,23 @@ class _ShopScreenState extends State<ShopScreen> {
                     visibleProducts.length,
                     products.length,
                   ),
+                ),
+                FutureBuilder<ShopPersonalizationSignals>(
+                  future: _signalsFuture,
+                  builder: (context, signalsSnapshot) {
+                    final recommendations = _personalizedProducts(
+                      products,
+                      signalsSnapshot.data ?? ShopPersonalizationSignals.empty,
+                    );
+
+                    if (recommendations.isEmpty) {
+                      return const SliverToBoxAdapter(child: SizedBox.shrink());
+                    }
+
+                    return SliverToBoxAdapter(
+                      child: _buildPersonalRecommendations(recommendations),
+                    );
+                  },
                 ),
                 if (snapshot.hasError)
                   SliverFillRemaining(
@@ -201,6 +257,15 @@ class _ShopScreenState extends State<ShopScreen> {
                   ),
                 ),
                 const Spacer(),
+                IconButton(
+                  tooltip: 'Мои заказы',
+                  onPressed:
+                      () => Navigator.pushNamed(context, AppRoutes.shopOrders),
+                  icon: const Icon(
+                    Icons.receipt_long_outlined,
+                    color: Colors.white,
+                  ),
+                ),
                 ListenableBuilder(
                   listenable: CartProvider.instance,
                   builder: (context, _) {
@@ -335,6 +400,156 @@ class _ShopScreenState extends State<ShopScreen> {
                   child: const Text('Сбросить'),
                 ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPersonalRecommendations(List<B2BInventoryModel> products) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 0, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 20),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.auto_awesome_rounded,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Персонально для вас',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 180,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: products.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final product = products[index];
+                final color = ShopProductMapper.categoryColor(product.category);
+                return SizedBox(
+                  width: 230,
+                  child: Material(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(22),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(22),
+                      onTap: () {
+                        Navigator.pushNamed(
+                          context,
+                          AppRoutes.shopProduct,
+                          arguments: _productMap(product),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 42,
+                                  height: 42,
+                                  decoration: BoxDecoration(
+                                    color: color.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: Icon(
+                                    ShopProductMapper.categoryIcon(
+                                      product.category,
+                                    ),
+                                    color: color,
+                                    size: 20,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  '${product.stock} шт',
+                                  style: TextStyle(
+                                    color:
+                                        Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              product.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 15,
+                              ),
+                            ),
+                            const Spacer(),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    ShopProductMapper.formatPrice(
+                                      product.price,
+                                    ),
+                                    style: const TextStyle(
+                                      color: Color(0xFF10B981),
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                                IconButton.filled(
+                                  onPressed:
+                                      product.stock <= 0
+                                          ? null
+                                          : () => _addToCart(context, product),
+                                  icon: const Icon(
+                                    Icons.add_shopping_cart_rounded,
+                                    size: 18,
+                                  ),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: const Color(0xFF10B981),
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),

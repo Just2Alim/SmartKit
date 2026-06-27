@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/router/app_routes.dart';
+import '../../../../core/services/analytics_service.dart';
 import '../data/b2b_inventory_repository.dart';
 import '../data/b2b_locations_repository.dart';
 import '../models/b2b_inventory_model.dart';
@@ -159,6 +160,10 @@ class _B2BAddMedicineScreenState extends State<B2BAddMedicineScreen> {
     if (result is! Map<String, dynamic>) return;
 
     final ocr = B2BOcrResult.fromMap(result);
+    AnalyticsService.instance.trackFeature(
+      'b2b_package_ocr',
+      action: 'result_applied',
+    );
     setState(() {
       _fill(nameCtrl, ocr.name);
       _fill(manufacturerCtrl, ocr.manufacturer);

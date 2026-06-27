@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/services/analytics_service.dart';
 import 'b2b_organization_resolver.dart';
 import 'b2b_activity_repository.dart';
 import '../models/b2b_activity_model.dart';
@@ -36,6 +37,11 @@ class B2BInventoryRepository {
         },
       ),
     );
+    AnalyticsService.instance.trackFeature(
+      'b2b_inventory',
+      action: 'item_created',
+      properties: {'source': item.barcode == null ? 'manual' : 'scan'},
+    );
 
     return inserted['id'].toString();
   }
@@ -69,6 +75,10 @@ class B2BInventoryRepository {
           'category': item.category,
         },
       ),
+    );
+    AnalyticsService.instance.trackFeature(
+      'b2b_inventory',
+      action: 'item_updated',
     );
   }
 
@@ -161,6 +171,10 @@ class B2BInventoryRepository {
           },
         ),
       );
+      AnalyticsService.instance.trackFeature(
+        'b2b_inventory',
+        action: 'item_deleted',
+      );
     }
   }
 
@@ -185,6 +199,10 @@ class B2BInventoryRepository {
           timestamp: DateTime.now(),
           metadata: {'oldStock': item.stock, 'newStock': newStock},
         ),
+      );
+      AnalyticsService.instance.trackFeature(
+        'b2b_inventory',
+        action: 'stock_updated',
       );
     }
   }
@@ -233,6 +251,11 @@ class B2BInventoryRepository {
           'source': source,
         },
       ),
+    );
+    AnalyticsService.instance.trackFeature(
+      'b2b_inventory',
+      action: 'stock_received',
+      properties: {'quantity': quantity, 'source': source},
     );
   }
 

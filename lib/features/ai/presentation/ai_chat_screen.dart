@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/router/app_routes.dart';
+import '../../../core/services/analytics_service.dart';
 import '../../../core/services/ai_provider.dart';
 import '../../../core/services/ai_service_interface.dart';
 import '../../../core/state/cart_provider.dart';
@@ -168,6 +169,15 @@ class _AiChatScreenState extends State<AiChatScreen>
   Future<void> _sendMessage([String? preset]) async {
     final text = (preset ?? _controller.text).trim();
     if (text.isEmpty || isAiTyping) return;
+    AnalyticsService.instance.trackFeature(
+      'ai_chat',
+      action: 'message_sent',
+      properties: {
+        'mode': widget.mode ?? 'default',
+        'preset': preset != null,
+        'kit_intent': AiKitPlanner.hasKitIntent(text),
+      },
+    );
 
     setState(() {
       messages.add(_ChatMessage(text: text, isUser: true));

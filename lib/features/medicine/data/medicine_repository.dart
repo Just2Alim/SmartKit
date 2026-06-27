@@ -1,52 +1,140 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/services/analytics_service.dart';
+import '../../family/data/family_repository.dart';
 import '../models/medicine_intake_log_model.dart';
 import '../models/medicine_model.dart';
 
 class MedicineRepository {
   SupabaseClient get _client => Supabase.instance.client;
+  final FamilyRepository _familyRepository = FamilyRepository();
+  static const Duration _initialLoadTimeout = Duration(seconds: 8);
 
   Future<void> addMedicine(MedicineModel medicine) async {
-    await _client.from('medicines').insert(medicine.toMap());
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw Exception('Пользователь не авторизован');
+    }
+
+    final familyId = await _familyRepository.ensureDefaultFamily();
+    final payload =
+        medicine.toMap()
+          ..['user_id'] = user.id
+          ..['family_id'] = medicine.familyId ?? familyId
+          ..['created_by_user_id'] = medicine.createdByUserId ?? user.id;
+
+    await _client.from('medicines').insert(payload);
+    AnalyticsService.instance.trackFeature(
+      'medicine',
+      action: 'created',
+      properties: {'source': medicine.scanSource ?? 'manual'},
+    );
   }
 
   Future<void> addMedicines(List<MedicineModel> medicines) async {
     if (medicines.isEmpty) return;
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw Exception('Пользователь не авторизован');
+    }
+
+    final familyId = await _familyRepository.ensureDefaultFamily();
     await _client
         .from('medicines')
-        .insert(medicines.map((medicine) => medicine.toMap()).toList());
+        .insert(
+          medicines.map((medicine) {
+            return medicine.toMap()
+              ..['user_id'] = user.id
+              ..['family_id'] = medicine.familyId ?? familyId
+              ..['created_by_user_id'] = medicine.createdByUserId ?? user.id;
+          }).toList(),
+        );
+    AnalyticsService.instance.trackFeature(
+      'medicine',
+      action: 'bulk_created',
+      properties: {'count': medicines.length},
+    );
   }
 
-  Stream<List<MedicineModel>> getMedicinesByUser(String userId) {
-    return _client
-        .from('medicines')
-        .stream(primaryKey: ['id'])
-        .eq('user_id', userId)
-        .order('created_at', ascending: false)
-        .map(
-          (rows) =>
-              rows.map((row) => MedicineModel.fromMap(row)).toList()
-                ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
-        );
+  Stream<List<MedicineModel>> getMedicinesByUser(String userId) async* {
+    if (_client.auth.currentUser == null) {
+      yield [];
+      return;
+    }
+
+    try {
+      final familyId = await _familyRepository.ensureDefaultFamily();
+      final initialRows = await _client
+          .from('medicines')
+          .select()
+          .eq('family_id', familyId)
+          .order('created_at', ascending: false)
+          .timeout(_initialLoadTimeout);
+      yield _mapMedicineRows(
+        initialRows.map((row) => Map<String, dynamic>.from(row)).toList(),
+      );
+
+      yield* _client
+          .from('medicines')
+          .stream(primaryKey: ['id'])
+          .eq('family_id', familyId)
+          .order('created_at', ascending: false)
+          .map(_mapMedicineRows);
+    } catch (_) {
+      yield* _client
+          .from('medicines')
+          .stream(primaryKey: ['id'])
+          .eq('user_id', userId)
+          .order('created_at', ascending: false)
+          .map(_mapMedicineRows);
+    }
   }
 
   Stream<List<MedicineModel>> getMedicinesByFamilyMember({
     required String userId,
     required String familyMemberId,
-  }) {
-    return _client
-        .from('medicines')
-        .stream(primaryKey: ['id'])
-        .eq('user_id', userId)
-        .order('created_at', ascending: false)
-        .map(
-          (rows) =>
-              rows
-                  .where((row) => row['family_member_id'] == familyMemberId)
-                  .map((row) => MedicineModel.fromMap(row))
-                  .toList()
-                ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
-        );
+  }) async* {
+    if (_client.auth.currentUser == null) {
+      yield [];
+      return;
+    }
+
+    List<MedicineModel> mapForMember(List<Map<String, dynamic>> rows) {
+      return rows
+          .where((row) => row['family_member_id'] == familyMemberId)
+          .map((row) => MedicineModel.fromMap(row))
+          .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
+
+    try {
+      final familyId = await _familyRepository.ensureDefaultFamily();
+      final initialRows = await _client
+          .from('medicines')
+          .select()
+          .eq('family_id', familyId)
+          .order('created_at', ascending: false)
+          .timeout(_initialLoadTimeout);
+      yield mapForMember(
+        initialRows.map((row) => Map<String, dynamic>.from(row)).toList(),
+      );
+
+      yield* _client
+          .from('medicines')
+          .stream(primaryKey: ['id'])
+          .eq('family_id', familyId)
+          .order('created_at', ascending: false)
+          .map(mapForMember);
+    } catch (_) {
+      yield* _client
+          .from('medicines')
+          .stream(primaryKey: ['id'])
+          .eq('user_id', userId)
+          .order('created_at', ascending: false)
+          .map(mapForMember);
+    }
   }
 
   Future<MedicineModel?> getMedicineById(String medicineId) async {
@@ -104,6 +192,7 @@ class MedicineRepository {
     if (scanSource != null) updates['scan_source'] = scanSource;
 
     await _client.from('medicines').update(updates).eq('id', medicineId);
+    AnalyticsService.instance.trackFeature('medicine', action: 'updated');
   }
 
   Future<MedicineIntakeResult> recordIntake({
@@ -116,26 +205,81 @@ class MedicineRepository {
       params: {'p_medicine_id': medicineId, 'p_amount': amount, 'p_note': note},
     );
 
+    AnalyticsService.instance.trackFeature(
+      'medicine_intake',
+      action: 'recorded',
+      properties: {'amount': amount},
+    );
     return MedicineIntakeResult.fromMap(Map<String, dynamic>.from(data as Map));
   }
 
   Stream<List<MedicineIntakeLogModel>> getIntakeLogsByMedicine(
     String medicineId,
-  ) {
-    return _client
+  ) async* {
+    try {
+      final initialRows = await _client
+          .from('medicine_intake_logs')
+          .select()
+          .eq('medicine_id', medicineId)
+          .order('taken_at', ascending: false)
+          .timeout(_initialLoadTimeout);
+      yield _mapIntakeRows(
+        initialRows.map((row) => Map<String, dynamic>.from(row)).toList(),
+      );
+    } catch (_) {
+      yield [];
+    }
+
+    yield* _client
         .from('medicine_intake_logs')
         .stream(primaryKey: ['id'])
         .eq('medicine_id', medicineId)
         .order('taken_at', ascending: false)
-        .map(
-          (rows) =>
-              rows.map((row) => MedicineIntakeLogModel.fromMap(row)).toList()
-                ..sort((a, b) => b.takenAt.compareTo(a.takenAt)),
-        );
+        .map(_mapIntakeRows);
+  }
+
+  Stream<List<MedicineIntakeLogModel>> getFamilyIntakeLogs() async* {
+    if (_client.auth.currentUser == null) {
+      yield [];
+      return;
+    }
+
+    try {
+      final familyId = await _familyRepository.ensureDefaultFamily();
+      final initialRows = await _client
+          .from('medicine_intake_logs')
+          .select()
+          .eq('family_id', familyId)
+          .order('taken_at', ascending: false)
+          .timeout(_initialLoadTimeout);
+      yield _mapIntakeRows(
+        initialRows.map((row) => Map<String, dynamic>.from(row)).toList(),
+      );
+
+      yield* _client
+          .from('medicine_intake_logs')
+          .stream(primaryKey: ['id'])
+          .eq('family_id', familyId)
+          .order('taken_at', ascending: false)
+          .map(_mapIntakeRows);
+    } catch (_) {
+      yield [];
+    }
+  }
+
+  List<MedicineModel> _mapMedicineRows(List<Map<String, dynamic>> rows) {
+    return rows.map((row) => MedicineModel.fromMap(row)).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
+  List<MedicineIntakeLogModel> _mapIntakeRows(List<Map<String, dynamic>> rows) {
+    return rows.map((row) => MedicineIntakeLogModel.fromMap(row)).toList()
+      ..sort((a, b) => b.takenAt.compareTo(a.takenAt));
   }
 
   Future<void> deleteMedicine(String medicineId) async {
     await _client.from('medicines').delete().eq('id', medicineId);
+    AnalyticsService.instance.trackFeature('medicine', action: 'deleted');
   }
 
   Stream<List<MedicineModel>> getExpiringMedicines({

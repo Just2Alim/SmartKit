@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/services/analytics_service.dart';
 import '../../../core/services/barcode_service.dart';
 import '../../family/data/family_repository.dart';
 import '../../family/models/family_member_model.dart';
@@ -370,6 +371,11 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     if (!mounted || result == null || result is! Map<String, dynamic>) return;
 
     _applyScanResult(result);
+    AnalyticsService.instance.trackFeature(
+      'barcode_scanner',
+      action: 'result_applied',
+      properties: {'needs_package_scan': result['needsPackageScan'] == true},
+    );
 
     if (result['needsPackageScan'] == true) {
       await _offerPackageScan(
@@ -444,6 +450,11 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
 
       final ocr = await _ocrService.scanPackageImage(image.path);
       final ocrMap = ocr.toMap();
+      AnalyticsService.instance.trackFeature(
+        'package_ocr',
+        action: 'completed',
+        properties: {'has_useful_data': ocr.hasUsefulData},
+      );
 
       Map<String, dynamic> merged = {
         'barcode':

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/services/analytics_service.dart';
 import '../../../core/state/cart_provider.dart';
 import '../../../core/widgets/bottom_nav_bar.dart';
 import '../../dashboard/presentation/dashboard_screen.dart';
@@ -18,20 +19,25 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  late int _currentIndex;
+  static const _tabNames = ['dashboard', 'search', 'family', 'shop', 'profile'];
 
-  final List<Widget> _screens = [
-    DashboardScreen(),
-    const SearchScreen(),
-    FamilyScreen(),
-    const ShopScreen(),
-    const ProfileScreen(),
-  ];
+  late int _currentIndex;
+  late final List<Widget> _screens;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    _screens = [
+      DashboardScreen(onOpenFamilyTab: () => _onTabTapped(2)),
+      const SearchScreen(),
+      FamilyScreen(),
+      const ShopScreen(),
+      const ProfileScreen(),
+    ];
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _trackTab(_currentIndex);
+    });
   }
 
   void _onTabTapped(int index) {
@@ -39,6 +45,15 @@ class _MainScreenState extends State<MainScreen> {
     setState(() {
       _currentIndex = index;
     });
+    _trackTab(index);
+  }
+
+  void _trackTab(int index) {
+    AnalyticsService.instance.trackTab(
+      area: 'b2c',
+      tab: _tabNames[index],
+      index: index,
+    );
   }
 
   @override

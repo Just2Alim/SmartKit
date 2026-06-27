@@ -1,6 +1,9 @@
 class FamilyMemberModel {
   final String id;
   final String userId;
+  final String? familyId;
+  final String? linkedUserId;
+  final String? createdByUserId;
   final String name;
   final String relation;
   final int age;
@@ -10,6 +13,9 @@ class FamilyMemberModel {
   FamilyMemberModel({
     required this.id,
     required this.userId,
+    this.familyId,
+    this.linkedUserId,
+    this.createdByUserId,
     required this.name,
     required this.relation,
     required this.age,
@@ -20,6 +26,9 @@ class FamilyMemberModel {
   Map<String, dynamic> toMap() {
     return {
       'user_id': userId,
+      'family_id': familyId,
+      'linked_user_id': linkedUserId,
+      'created_by_user_id': createdByUserId,
       'name': name,
       'relation': relation,
       'age': age,
@@ -37,6 +46,9 @@ class FamilyMemberModel {
     return FamilyMemberModel(
       id: data['id'] ?? '',
       userId: data['user_id'] ?? data['userId'] ?? '',
+      familyId: data['family_id'] ?? data['familyId'],
+      linkedUserId: data['linked_user_id'] ?? data['linkedUserId'],
+      createdByUserId: data['created_by_user_id'] ?? data['createdByUserId'],
       name: data['name'] ?? '',
       relation: data['relation'] ?? '',
       age: data['age'] ?? 0,

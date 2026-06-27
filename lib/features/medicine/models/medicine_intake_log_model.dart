@@ -4,6 +4,8 @@ class MedicineIntakeResult {
   final int quantityBefore;
   final int quantityAfter;
   final int amount;
+  final String? actorUserId;
+  final String? actorName;
 
   const MedicineIntakeResult({
     this.logId,
@@ -11,6 +13,8 @@ class MedicineIntakeResult {
     required this.quantityBefore,
     required this.quantityAfter,
     required this.amount,
+    this.actorUserId,
+    this.actorName,
   });
 
   factory MedicineIntakeResult.fromMap(Map<String, dynamic> data) {
@@ -20,6 +24,8 @@ class MedicineIntakeResult {
       quantityBefore: data['quantityBefore'] ?? 0,
       quantityAfter: data['quantityAfter'] ?? 0,
       amount: data['amount'] ?? 1,
+      actorUserId: data['actorUserId']?.toString(),
+      actorName: data['actorName']?.toString(),
     );
   }
 }
@@ -27,8 +33,11 @@ class MedicineIntakeResult {
 class MedicineIntakeLogModel {
   final String id;
   final String userId;
+  final String? familyId;
   final String medicineId;
   final String? familyMemberId;
+  final String? actorUserId;
+  final String? actorName;
   final int amount;
   final int quantityBefore;
   final int quantityAfter;
@@ -39,8 +48,11 @@ class MedicineIntakeLogModel {
   const MedicineIntakeLogModel({
     required this.id,
     required this.userId,
+    this.familyId,
     required this.medicineId,
     this.familyMemberId,
+    this.actorUserId,
+    this.actorName,
     required this.amount,
     required this.quantityBefore,
     required this.quantityAfter,
@@ -58,8 +70,11 @@ class MedicineIntakeLogModel {
     return MedicineIntakeLogModel(
       id: data['id'] ?? '',
       userId: data['user_id'] ?? data['userId'] ?? '',
+      familyId: data['family_id'] ?? data['familyId'],
       medicineId: data['medicine_id'] ?? data['medicineId'] ?? '',
       familyMemberId: data['family_member_id'] ?? data['familyMemberId'],
+      actorUserId: data['actor_user_id'] ?? data['actorUserId'],
+      actorName: data['actor_name'] ?? data['actorName'],
       amount: data['amount'] ?? 1,
       quantityBefore: data['quantity_before'] ?? data['quantityBefore'] ?? 0,
       quantityAfter: data['quantity_after'] ?? data['quantityAfter'] ?? 0,

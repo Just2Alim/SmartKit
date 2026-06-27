@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smartkit/core/services/b2b_ai_service.dart';
+import 'package:smartkit/core/services/analytics_service.dart';
 import '../../models/b2b_inventory_model.dart';
 import '../../models/b2b_sale_model.dart';
 
@@ -26,6 +27,10 @@ class _B2BAiInsightsWidgetState extends State<B2BAiInsightsWidget> {
   bool _isLoading = false;
 
   Future<void> _runAnalysis() async {
+    AnalyticsService.instance.trackFeature(
+      'b2b_ai_analysis',
+      action: 'requested',
+    );
     setState(() {
       _isLoading = true;
     });

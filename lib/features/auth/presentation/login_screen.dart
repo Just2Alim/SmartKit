@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../family/data/family_repository.dart';
 import '../data/auth_repository.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -12,6 +13,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _authRepository = AuthRepository();
+  final _familyRepository = FamilyRepository();
 
   final emailCtrl = TextEditingController();
   final passwordCtrl = TextEditingController();
@@ -27,6 +29,11 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> loginUser() async {
+    final args = ModalRoute.of(context)?.settings.arguments;
+    final familyInviteToken =
+        args is Map<String, dynamic>
+            ? args['familyInviteToken'] as String?
+            : null;
     final email = emailCtrl.text.trim();
     final password = passwordCtrl.text.trim();
 
@@ -55,9 +62,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (appUser.role == 'b2b') {
         await ThemeProvider.instance.reloadFromSupabase();
+        if (!mounted) return;
         Navigator.pushReplacementNamed(context, AppRoutes.b2bDashboard);
       } else {
+        if (familyInviteToken != null && familyInviteToken.trim().isNotEmpty) {
+          await _familyRepository.acceptFamilyInvite(familyInviteToken);
+        }
         await ThemeProvider.instance.reloadFromSupabase();
+        if (!mounted) return;
         Navigator.pushReplacementNamed(context, AppRoutes.main);
       }
     } catch (e) {

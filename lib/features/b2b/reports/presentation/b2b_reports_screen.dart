@@ -96,6 +96,92 @@ class B2BReportsScreen extends StatelessWidget {
     return result;
   }
 
+  double _seasonalityFactor(String category, DateTime now) {
+    final text = category.toLowerCase();
+    final winter = now.month >= 10 || now.month <= 3;
+    final allergySeason = now.month >= 4 && now.month <= 7;
+    final travelSeason = now.month >= 6 && now.month <= 8;
+
+    if (winter &&
+        (text.contains('простуд') ||
+            text.contains('противовирус') ||
+            text.contains('жаропониж') ||
+            text.contains('лор'))) {
+      return 1.35;
+    }
+    if (allergySeason && text.contains('аллерг')) return 1.30;
+    if (travelSeason && (text.contains('жкт') || text.contains('сорб'))) {
+      return 1.18;
+    }
+    if (winter && text.contains('витамин')) return 1.12;
+    return 1.0;
+  }
+
+  List<_DemandForecastItem> _demandForecast(
+    List<B2BInventoryModel> inventory,
+    List<B2BSaleModel> sales,
+  ) {
+    final now = DateTime.now();
+    final inventoryById = {for (final item in inventory) item.id: item};
+    final recentCutoff = now.subtract(const Duration(days: 30));
+    final previousCutoff = now.subtract(const Duration(days: 60));
+    final recentUnits = <String, int>{};
+    final previousUnits = <String, int>{};
+
+    for (final sale in sales) {
+      for (final rawItem in sale.items) {
+        final itemId =
+            (rawItem['inventory_id'] ?? rawItem['id'])?.toString() ?? '';
+        if (itemId.isEmpty) continue;
+        final quantity = (rawItem['quantity'] as num?)?.toInt() ?? 1;
+
+        if (sale.saleDate.isAfter(recentCutoff)) {
+          recentUnits[itemId] = (recentUnits[itemId] ?? 0) + quantity;
+        } else if (sale.saleDate.isAfter(previousCutoff)) {
+          previousUnits[itemId] = (previousUnits[itemId] ?? 0) + quantity;
+        }
+      }
+    }
+
+    final forecasts = <_DemandForecastItem>[];
+    for (final entry in recentUnits.entries) {
+      final item = inventoryById[entry.key];
+      if (item == null) continue;
+
+      final recent = entry.value;
+      final previous = previousUnits[item.id] ?? 0;
+      final trendFactor =
+          previous <= 0 ? 1.12 : (recent / previous).clamp(0.72, 1.55);
+      final seasonal = _seasonalityFactor(item.category, now);
+      final forecastUnits = (recent * trendFactor * seasonal).ceil();
+      final dailyDemand = forecastUnits / 30;
+      final daysCover =
+          dailyDemand <= 0 ? 999 : (item.stock / dailyDemand).floor();
+      final reorderQuantity =
+          (forecastUnits + item.minStock - item.stock).clamp(0, 99999).toInt();
+
+      forecasts.add(
+        _DemandForecastItem(
+          item: item,
+          recentUnits: recent,
+          forecastUnits: forecastUnits,
+          daysCover: daysCover,
+          reorderQuantity: reorderQuantity,
+          seasonalFactor: seasonal,
+          trendFactor: trendFactor.toDouble(),
+        ),
+      );
+    }
+
+    forecasts.sort((a, b) {
+      final riskCompare = a.daysCover.compareTo(b.daysCover);
+      if (riskCompare != 0) return riskCompare;
+      return b.forecastUnits.compareTo(a.forecastUnits);
+    });
+
+    return forecasts.take(6).toList();
+  }
+
   String _formatPrice(int value) {
     return '$value ₸';
   }
@@ -211,6 +297,8 @@ class B2BReportsScreen extends StatelessWidget {
                                 sales: sales,
                                 locations: locations,
                               ),
+                              const SizedBox(height: 32),
+                              _buildDemandForecast(context, inventory, sales),
                               const SizedBox(height: 32),
                               Text(
                                 'Распределение запасов',
@@ -726,6 +814,154 @@ class B2BReportsScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildDemandForecast(
+    BuildContext context,
+    List<B2BInventoryModel> inventory,
+    List<B2BSaleModel> sales,
+  ) {
+    final forecast = _demandForecast(inventory, sales);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Прогноз спроса',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Расчет на 30 дней: продажи, тренд и сезонный коэффициент.',
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (forecast.isEmpty)
+          _emptyCard(
+            context,
+            'Недостаточно продаж для прогноза. Данные появятся после онлайн-заказов или продаж с товарными позициями.',
+          )
+        else
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+            child: Column(
+              children:
+                  forecast.map((item) {
+                    final isRisk = item.daysCover <= 14;
+                    final color =
+                        isRisk
+                            ? const Color(0xFFDC2626)
+                            : const Color(0xFF10B981);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Icon(
+                              isRisk
+                                  ? Icons.priority_high_rounded
+                                  : Icons.trending_up_rounded,
+                              color: color,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.item.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '30 дней: ${item.forecastUnits} шт. • запас на ${item.daysCover} дн.',
+                                  style: TextStyle(
+                                    color:
+                                        Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Тренд x${item.trendFactor.toStringAsFixed(2)} • сезон x${item.seasonalFactor.toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    color:
+                                        Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                item.reorderQuantity > 0
+                                    ? '+${item.reorderQuantity}'
+                                    : 'ОК',
+                                style: TextStyle(
+                                  color: color,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              Text(
+                                'заказать',
+                                style: TextStyle(
+                                  color:
+                                      Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _salesFooterStat(String value, String label) {
     return Expanded(
       child: Column(
@@ -899,4 +1135,24 @@ class B2BReportsScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DemandForecastItem {
+  final B2BInventoryModel item;
+  final int recentUnits;
+  final int forecastUnits;
+  final int daysCover;
+  final int reorderQuantity;
+  final double seasonalFactor;
+  final double trendFactor;
+
+  const _DemandForecastItem({
+    required this.item,
+    required this.recentUnits,
+    required this.forecastUnits,
+    required this.daysCover,
+    required this.reorderQuantity,
+    required this.seasonalFactor,
+    required this.trendFactor,
+  });
 }

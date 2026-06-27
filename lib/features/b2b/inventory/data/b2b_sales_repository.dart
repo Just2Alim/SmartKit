@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/services/analytics_service.dart';
 import '../models/b2b_sale_model.dart';
 
 import 'b2b_activity_repository.dart';
@@ -56,6 +57,11 @@ class B2BSalesRepository {
         metadata: {'amount': sale.totalAmount, 'itemsCount': sale.items.length},
       ),
     );
+    AnalyticsService.instance.trackFeature(
+      'b2b_sale',
+      action: 'recorded',
+      properties: {'items_count': sale.items.length},
+    );
   }
 
   Future<String> recordShopCheckout({
@@ -70,6 +76,11 @@ class B2BSalesRepository {
         'cart_items': items,
         'staff_name': staffName ?? 'Онлайн-магазин',
       },
+    );
+    AnalyticsService.instance.trackFeature(
+      'b2b_sale',
+      action: 'shop_checkout_recorded',
+      properties: {'items_count': items.length},
     );
     return saleId.toString();
   }

@@ -72,6 +72,19 @@ Deno.serve(async (request) => {
       );
     }
 
+    let analyticsDays = 30;
+    if (request.method === "POST") {
+      try {
+        const body = await request.json();
+        const requestedDays = Number(body?.analyticsDays ?? 30);
+        analyticsDays = Number.isFinite(requestedDays)
+          ? Math.min(Math.max(requestedDays, 7), 90)
+          : 30;
+      } catch (_) {
+        analyticsDays = 30;
+      }
+    }
+
     const today = startOfDayIso(0);
     const weekStart = startOfDayIso(7);
 
@@ -86,6 +99,8 @@ Deno.serve(async (request) => {
       inventoryResult,
       salesResult,
       orgsResult,
+      analyticsResult,
+      recentEventsResult,
     ] = await Promise.all([
       supabase.from("profiles").select("id", { count: "exact", head: true }),
       supabase
@@ -125,6 +140,16 @@ Deno.serve(async (request) => {
       supabase
         .from("organizations")
         .select("id", { count: "exact", head: true }),
+      supabase.rpc("get_app_analytics_summary", {
+        p_days: analyticsDays,
+      }),
+      supabase
+        .from("app_analytics_events")
+        .select(
+          "id, user_id, session_id, event_name, category, screen_name, previous_screen, platform, properties, occurred_at",
+        )
+        .order("occurred_at", { ascending: false })
+        .limit(250),
     ]);
 
     const profiles = profilesResult.data ?? [];
@@ -225,6 +250,39 @@ Deno.serve(async (request) => {
       };
     });
 
+    const analytics =
+      (analyticsResult.data as Record<string, unknown> | null) ?? {};
+    const userActivity = Array.isArray(analytics.userActivity)
+      ? analytics.userActivity.map((row: Record<string, unknown>) => {
+          const profile = profileById.get(String(row.userId));
+          return {
+            ...row,
+            email: profile?.email ?? "unknown",
+            role: profile?.role ?? "unknown",
+          };
+        })
+      : [];
+
+    const recentEvents = (recentEventsResult.data ?? []).map(
+      (row: Record<string, unknown>) => {
+        const profile = profileById.get(String(row.user_id));
+        return {
+          id: row.id,
+          userId: row.user_id,
+          userEmail: profile?.email ?? "unknown",
+          userRole: profile?.role ?? "unknown",
+          sessionId: row.session_id,
+          eventName: row.event_name,
+          category: row.category,
+          screenName: row.screen_name,
+          previousScreen: row.previous_screen,
+          platform: row.platform,
+          properties: row.properties,
+          occurredAt: row.occurred_at,
+        };
+      },
+    );
+
     return jsonResponse({
       generatedAt: new Date().toISOString(),
       totals: {
@@ -268,6 +326,16 @@ Deno.serve(async (request) => {
         stockValue,
         weeklySales: sales.length,
         weeklyRevenue,
+      },
+      productAnalytics: {
+        ...analytics,
+        userActivity,
+        recentEvents,
+        available: !analyticsResult.error && !recentEventsResult.error,
+        error:
+          analyticsResult.error?.message ??
+          recentEventsResult.error?.message ??
+          null,
       },
       recentRequests,
     });

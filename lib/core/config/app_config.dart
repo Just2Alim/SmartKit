@@ -9,6 +9,9 @@ class AppConfig {
     'SMARTKIT_API_BASE_URL',
     defaultValue: 'http://localhost:8787',
   );
+  static const String familyInviteBaseUrl = String.fromEnvironment(
+    'SMARTKIT_FAMILY_INVITE_BASE_URL',
+  );
 
   static bool get hasSupabaseConfig =>
       supabaseUrl.trim().isNotEmpty && supabaseAnonKey.trim().isNotEmpty;

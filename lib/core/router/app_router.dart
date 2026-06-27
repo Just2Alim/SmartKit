@@ -9,6 +9,7 @@ import '../../features/profile/presentation/settings_screen.dart';
 import '../../features/profile/presentation/edit_profile_screen.dart';
 import '../../features/medicine/presentation/search_screen.dart';
 import '../../features/family/presentation/family_screen.dart';
+import '../../features/family/presentation/family_invite_screen.dart';
 import '../../features/medicine/presentation/add_medicine_screen.dart';
 import '../../features/medicine/presentation/medicine_detail_screen.dart';
 import '../../features/medicine/presentation/edit_medicine_screen.dart';
@@ -28,6 +29,7 @@ import '../../features/ai/presentation/ai_recommendations_screen.dart';
 import '../../features/ai/presentation/ai_kit_builder_screen.dart';
 import '../../features/shop/presentation/shop_screen.dart';
 import '../../features/shop/presentation/shop_product_screen.dart';
+import '../../features/shop/presentation/shop_orders_screen.dart';
 import '../../features/shop/presentation/cart_screen.dart';
 import '../../features/main/presentation/main_screen.dart';
 import '../../features/b2b/auth/presentation/b2b_login_screen.dart';
@@ -42,6 +44,7 @@ import '../../features/b2b/inventory/presentation/b2b_package_ocr_screen.dart';
 import '../../features/b2b/inventory/presentation/b2b_sales_history_screen.dart';
 import '../../features/b2b/inventory/presentation/b2b_locations_screen.dart';
 import '../../features/b2b/main/presentation/b2b_main_screen.dart';
+import '../../features/b2b/orders/presentation/b2b_orders_screen.dart';
 import '../../features/b2b/reports/presentation/b2b_reports_screen.dart';
 import '../../features/b2b/settings/presentation/b2b_settings_screen.dart';
 import '../../features/b2b/team/presentation/b2b_team_screen.dart';
@@ -51,38 +54,47 @@ class AppRouter {
   static const initialRoute = AppRoutes.splash;
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
+    final routeUri = Uri.tryParse(settings.name ?? '');
+    if (routeUri?.path == AppRoutes.familyInvite) {
+      return _page(
+        settings,
+        FamilyInviteScreen(initialToken: routeUri?.queryParameters['token']),
+      );
+    }
+
     switch (settings.name) {
       case AppRoutes.splash:
-        return _page(const AuthGate());
+        return _page(settings, const AuthGate());
 
       case AppRoutes.onboarding:
-        return _page(const OnboardingScreen());
+        return _page(settings, const OnboardingScreen());
 
       case AppRoutes.login:
-        return _page(const LoginScreen());
+        return _page(settings, const LoginScreen());
 
       case AppRoutes.signup:
-        return _page(const SignupScreen());
+        return _page(settings, const SignupScreen());
 
       case AppRoutes.chooseRole:
-        return _page(const ChooseRoleScreen());
+        return _page(settings, const ChooseRoleScreen());
 
       case AppRoutes.reminders:
-        return _page(RemindersScreen());
+        return _page(settings, RemindersScreen());
 
       case AppRoutes.addReminder:
-        return _page(const AddReminderScreen());
+        return _page(settings, const AddReminderScreen());
 
       case AppRoutes.main:
-        return _page(const MainScreen());
+        return _page(settings, const MainScreen());
 
       case AppRoutes.dashboard:
-        return _page(DashboardScreen());
+        return _page(settings, DashboardScreen());
 
       case AppRoutes.addMedicine:
         final args = settings.arguments;
         if (args is Map<String, dynamic>) {
           return _page(
+            settings,
             AddMedicineScreen(
               preselectedMemberId: args['memberId'] as String?,
               initialName: args['name'] as String?,
@@ -91,136 +103,157 @@ class AppRouter {
             ),
           );
         }
-        return _page(AddMedicineScreen(preselectedMemberId: args as String?));
+        return _page(
+          settings,
+          AddMedicineScreen(preselectedMemberId: args as String?),
+        );
 
       case AppRoutes.scanBarcode:
-        return _page(const BarcodeScannerScreen());
+        return _page(settings, const BarcodeScannerScreen());
 
       case AppRoutes.medicineDetail:
         final medicineId = settings.arguments as String;
-        return _page(MedicineDetailScreen(medicineId: medicineId));
+        return _page(settings, MedicineDetailScreen(medicineId: medicineId));
 
       case AppRoutes.editMedicine:
         final medicineId = settings.arguments as String;
-        return _page(EditMedicineScreen(medicineId: medicineId));
+        return _page(settings, EditMedicineScreen(medicineId: medicineId));
 
       case AppRoutes.notifications:
-        return _page(NotificationsScreen());
+        return _page(settings, NotificationsScreen());
 
       case AppRoutes.search:
-        return _page(const SearchScreen());
+        return _page(settings, const SearchScreen());
 
       case AppRoutes.family:
-        return _page(FamilyScreen());
+        return _page(settings, FamilyScreen());
 
       case AppRoutes.addFamilyMember:
-        return _page(const AddFamilyMemberScreen());
+        return _page(settings, const AddFamilyMemberScreen());
+
+      case AppRoutes.familyInvite:
+        final args = settings.arguments;
+        final token =
+            args is Map<String, dynamic>
+                ? args['token'] as String?
+                : args is String
+                ? args
+                : null;
+        return _page(settings, FamilyInviteScreen(initialToken: token));
 
       case AppRoutes.familyMemberProfile:
         final memberId = settings.arguments as String;
-        return _page(FamilyMemberProfileScreen(memberId: memberId));
+        return _page(settings, FamilyMemberProfileScreen(memberId: memberId));
 
       case AppRoutes.familyMemberMedicines:
         final memberId = settings.arguments as String;
-        return _page(FamilyMemberMedicinesScreen(memberId: memberId));
+        return _page(settings, FamilyMemberMedicinesScreen(memberId: memberId));
 
       case AppRoutes.editFamilyMember:
         final memberId = settings.arguments as String;
-        return _page(EditFamilyMemberScreen(memberId: memberId));
+        return _page(settings, EditFamilyMemberScreen(memberId: memberId));
 
       case AppRoutes.profile:
-        return _page(const ProfileScreen());
+        return _page(settings, const ProfileScreen());
 
       case AppRoutes.editProfile:
-        return _page(const EditProfileScreen());
+        return _page(settings, const EditProfileScreen());
 
       case AppRoutes.settings:
-        return _page(const SettingsScreen());
+        return _page(settings, const SettingsScreen());
 
       case AppRoutes.analytics:
-        return _page(AnalyticsScreen());
+        return _page(settings, AnalyticsScreen());
 
       case AppRoutes.aiFeatures:
-        return _page(const AiFeaturesScreen());
+        return _page(settings, const AiFeaturesScreen());
 
       case AppRoutes.aiChat:
         final mode = settings.arguments as String?;
-        return _page(AiChatScreen(mode: mode));
+        return _page(settings, AiChatScreen(mode: mode));
 
       case AppRoutes.aiRecommendations:
-        return _page(AiRecommendationsScreen());
+        return _page(settings, AiRecommendationsScreen());
 
       case AppRoutes.aiKitBuilder:
-        return _page(const AiKitBuilderScreen());
+        return _page(settings, const AiKitBuilderScreen());
 
       case AppRoutes.shop:
-        return _page(const ShopScreen());
+        return _page(settings, const ShopScreen());
 
       case AppRoutes.shopProduct:
         final product = settings.arguments as Map<String, dynamic>;
-        return _page(ShopProductScreen(product: product));
+        return _page(settings, ShopProductScreen(product: product));
+
+      case AppRoutes.shopOrders:
+        return _page(settings, ShopOrdersScreen());
 
       case AppRoutes.cart:
-        return _page(const CartScreen());
+        return _page(settings, const CartScreen());
 
       case AppRoutes.b2bOnboarding:
-        return _page(const B2BOnboardingScreen());
+        return _page(settings, const B2BOnboardingScreen());
 
       case AppRoutes.b2bLogin:
-        return _page(const B2BLoginScreen());
+        return _page(settings, const B2BLoginScreen());
 
       case AppRoutes.b2bSignup:
-        return _page(const B2BSignupScreen());
+        return _page(settings, const B2BSignupScreen());
 
       case AppRoutes.b2bMain:
       case AppRoutes.b2bDashboard:
-        return _page(const B2BMainScreen());
+        return _page(settings, const B2BMainScreen());
 
       case AppRoutes.b2bInventory:
-        return _page(B2BInventoryScreen());
+        return _page(settings, B2BInventoryScreen());
 
       case AppRoutes.b2bAddMedicine:
         final args = settings.arguments;
         if (args is String) {
-          return _page(B2BAddMedicineScreen(medicineId: args));
+          return _page(settings, B2BAddMedicineScreen(medicineId: args));
         }
         if (args is Map<String, dynamic>) {
           return _page(
+            settings,
             B2BAddMedicineScreen(medicineId: args['medicineId'] as String?),
           );
         }
-        return _page(const B2BAddMedicineScreen());
+        return _page(settings, const B2BAddMedicineScreen());
 
       case AppRoutes.b2bPackageOcr:
-        return _page(const B2BPackageOcrScreen());
+        return _page(settings, const B2BPackageOcrScreen());
 
       case AppRoutes.b2bMedicineDetail:
         final medicineId = settings.arguments as String;
-        return _page(B2BMedicineDetailScreen(medicineId: medicineId));
+        return _page(settings, B2BMedicineDetailScreen(medicineId: medicineId));
 
       case AppRoutes.b2bNotifications:
-        return _page(B2BNotificationsScreen());
+        return _page(settings, B2BNotificationsScreen());
 
       case AppRoutes.b2bReports:
-        return _page(B2BReportsScreen());
+        return _page(settings, B2BReportsScreen());
 
       case AppRoutes.b2bSettings:
-        return _page(const B2BSettingsScreen());
+        return _page(settings, const B2BSettingsScreen());
 
       case AppRoutes.b2bTeam:
-        return _page(const B2BTeamScreen());
+        return _page(settings, const B2BTeamScreen());
 
       case AppRoutes.b2bSalesHistory:
-        return _page(const B2BSalesHistoryScreen());
+        return _page(settings, const B2BSalesHistoryScreen());
+
+      case AppRoutes.b2bOrders:
+        return _page(settings, const B2BOrdersScreen());
 
       case AppRoutes.b2bActivityHistory:
-        return _page(const B2BActivityHistoryScreen());
+        return _page(settings, const B2BActivityHistoryScreen());
 
       case AppRoutes.b2bLocations:
-        return _page(const B2BLocationsScreen());
+        return _page(settings, const B2BLocationsScreen());
 
       default:
         return _page(
+          settings,
           Scaffold(
             body: Center(child: Text('Маршрут не найден: ${settings.name}')),
           ),
@@ -228,26 +261,7 @@ class AppRouter {
     }
   }
 
-  static MaterialPageRoute _page(Widget child) {
-    return MaterialPageRoute(builder: (_) => child);
-  }
-}
-
-class _PlaceholderScreen extends StatelessWidget {
-  final String title;
-
-  const _PlaceholderScreen({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Text(
-          title,
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
-        ),
-      ),
-    );
+  static MaterialPageRoute _page(RouteSettings settings, Widget child) {
+    return MaterialPageRoute(settings: settings, builder: (_) => child);
   }
 }

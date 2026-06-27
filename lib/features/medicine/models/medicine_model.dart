@@ -1,6 +1,8 @@
 class MedicineModel {
   final String id;
   final String userId;
+  final String? familyId;
+  final String? createdByUserId;
   final String? familyMemberId;
   final String name;
   final String dosage;
@@ -25,6 +27,8 @@ class MedicineModel {
   MedicineModel({
     required this.id,
     required this.userId,
+    this.familyId,
+    this.createdByUserId,
     this.familyMemberId,
     required this.name,
     required this.dosage,
@@ -50,6 +54,8 @@ class MedicineModel {
   Map<String, dynamic> toMap() {
     return {
       'user_id': userId,
+      'family_id': familyId,
+      'created_by_user_id': createdByUserId,
       'family_member_id': familyMemberId,
       'name': name,
       'dosage': dosage,
@@ -83,6 +89,8 @@ class MedicineModel {
     return MedicineModel(
       id: data['id'] ?? '',
       userId: data['user_id'] ?? data['userId'] ?? '',
+      familyId: data['family_id'] ?? data['familyId'],
+      createdByUserId: data['created_by_user_id'] ?? data['createdByUserId'],
       familyMemberId: data['family_member_id'] ?? data['familyMemberId'],
       name: data['name'] ?? '',
       dosage: data['dosage'] ?? '',

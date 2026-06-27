@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../family/data/family_repository.dart';
 import '../data/auth_repository.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -12,6 +13,7 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   final _authRepository = AuthRepository();
+  final _familyRepository = FamilyRepository();
 
   final nameCtrl = TextEditingController();
   final emailCtrl = TextEditingController();
@@ -32,8 +34,15 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Future<void> signUpUser() async {
+    final args = ModalRoute.of(context)?.settings.arguments;
     final role =
-        (ModalRoute.of(context)?.settings.arguments as String?) ?? 'b2c';
+        args is Map<String, dynamic>
+            ? (args['role'] as String? ?? 'b2c')
+            : (args as String?) ?? 'b2c';
+    final familyInviteToken =
+        args is Map<String, dynamic>
+            ? args['familyInviteToken'] as String?
+            : null;
 
     final name = nameCtrl.text.trim();
     final email = emailCtrl.text.trim();
@@ -74,6 +83,10 @@ class _SignupScreenState extends State<SignupScreen> {
         name: name,
         isDarkTheme: ThemeProvider.instance.isDarkMode,
       );
+
+      if (familyInviteToken != null && familyInviteToken.trim().isNotEmpty) {
+        await _familyRepository.acceptFamilyInvite(familyInviteToken);
+      }
 
       await ThemeProvider.instance.reloadFromSupabase();
 
@@ -125,8 +138,11 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final args = ModalRoute.of(context)?.settings.arguments;
     final role =
-        (ModalRoute.of(context)?.settings.arguments as String?) ?? 'b2c';
+        args is Map<String, dynamic>
+            ? (args['role'] as String? ?? 'b2c')
+            : (args as String?) ?? 'b2c';
 
     final isB2B = role == 'b2b';
 

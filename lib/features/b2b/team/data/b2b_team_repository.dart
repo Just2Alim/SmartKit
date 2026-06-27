@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/services/analytics_service.dart';
 import '../../inventory/data/b2b_organization_resolver.dart';
 import 'b2b_team_member_model.dart';
 
@@ -125,6 +126,11 @@ class B2BTeamRepository {
         'member_role': role,
       },
     );
+    AnalyticsService.instance.trackFeature(
+      'b2b_team',
+      action: 'member_invited',
+      properties: {'role': role},
+    );
   }
 
   Future<void> updateRole({
@@ -135,6 +141,11 @@ class B2BTeamRepository {
         .from('organization_members')
         .update({'role': role})
         .eq('id', memberId);
+    AnalyticsService.instance.trackFeature(
+      'b2b_team',
+      action: 'role_updated',
+      properties: {'role': role},
+    );
   }
 
   Future<void> updateStatus({
@@ -145,10 +156,19 @@ class B2BTeamRepository {
         .from('organization_members')
         .update({'status': status})
         .eq('id', memberId);
+    AnalyticsService.instance.trackFeature(
+      'b2b_team',
+      action: 'status_updated',
+      properties: {'status': status},
+    );
   }
 
   Future<void> removeMember(String memberId) async {
     await _client.from('organization_members').delete().eq('id', memberId);
+    AnalyticsService.instance.trackFeature(
+      'b2b_team',
+      action: 'member_removed',
+    );
   }
 
   static int _roleWeight(String role) {

@@ -25,9 +25,40 @@
 - [x] **AI Language Consistency**: Added latest-message language detection, strict per-request language instructions, mixed-language repair retries, and localized AI fallbacks for B2C, B2B, Gemini reserve, and AI kit cart summaries.
 - [x] **AI Kit Builder & Cart Handoff**: Rebuilt B2C kit assembly around user needs, current home medicines, live PostgreSQL catalog matching, missing-item warnings, confirmation buttons, cart creation, and cart navigation.
 - [x] **Universal Barcode & Package Scan**: Reworked B2C medicine scanning so unknown barcodes become editable drafts, public/learned/B2B lookup sources are checked, package OCR fills dosage/expiry/batch/package fields, and saved scans teach the PostgreSQL barcode cache.
+- [x] **Family Accounts & Shared Medicine Intake**: Added real family groups, account invite links, shared B2C medicine/reminder scope, and a realtime family-wide intake feed showing who gave medicine to whom.
+- [x] **Orders, Fake Payments & Demand Forecasting**: Added B2C personalized shop recommendations, fake-card checkout, real shop order lifecycle, B2B order operations, and seasonality-aware demand forecasting.
+- [x] **Family/AI Runtime Hotfix**: Applied Supabase migrations for family RPC,
+  fixed `ensure_default_family` calls, refreshed PostgREST schema cache, and
+  restored Qwen3 Edge Function path through the Ollama proxy on `127.0.0.1:11434`.
 - [ ] **Activity Detail/Navigation**: Add a dedicated screen to view the full history of activities, including filtering by type.
 
 ## Completed Work
+- **Runtime Fixes (2026-05-29)**:
+  - Fixed the `Моя семья` `PGRST202` crash by always passing `family_name` to
+    `ensure_default_family` from Flutter.
+  - Added `202605290001_family_rpc_schema_cache_fix.sql` with a no-arg
+    `ensure_default_family()` wrapper and `notify pgrst, 'reload schema'`.
+  - Fixed the family migration's legacy `medicine_intake_logs` update query so
+    Supabase can apply the migration cleanly.
+  - Applied pending Supabase migrations and redeployed `ai-chat`,
+    `business-analysis`, and `admin-dashboard`.
+  - Restarted the local Qwen3 proxy against the standard Ollama port `11434` and
+    updated Supabase AI secrets for the Edge Functions.
+- **B2C Shop Personalization, Orders & Payments**:
+  - Added `customer_payment_methods`, `shop_orders`, and `shop_order_items` with RLS and RPC-based checkout.
+  - Added fake-card creation that stores only brand, last4, expiry, cardholder, and fake token.
+  - Rebuilt cart checkout around payment method, delivery address, phone, stock validation, paid order creation, and linked B2B sale creation.
+  - Added B2C order history and a personalized recommendation shelf based on previous order categories and repeat-purchase signals.
+- **B2B Orders & Forecasting**:
+  - Added a B2B `Заказы` tab with status filters and order actions: confirm, assemble, ready, delivered, cancel.
+  - Cancelled orders now return stock, mark payment as refunded, and remove the linked sale from revenue/demand calculations.
+  - Added a B2B Reports demand forecast that combines last-30-day unit sales, previous-period trend, and seasonal category multipliers.
+- **Family Accounts & Shared Intake**:
+  - Added Supabase `families`, `family_account_members`, and `family_invites` with owner/admin/member roles, invite tokens, expiration, and RLS helpers.
+  - Added `family_id` to B2C family profiles, medicines, reminders, and intake logs while migrating existing user-owned records into a default family.
+  - Updated `record_medicine_intake` so any active family account can mark a medicine as given and all family accounts see the same log with `actor_name`.
+  - Added `FamilyInviteScreen` for `/#/family-invite?token=...`, login/signup invite acceptance, and copied invite links from `FamilyScreen`.
+  - Rebuilt `FamilyScreen` to show connected accounts, invite/accept actions, family profiles, and the shared recent medicine-giving feed.
 - **AI Reliability, Safety & Kit Assembly**:
   - Added shared AI safety prompts and deterministic request screening for emergency symptoms, off-topic requests, contraindication-sensitive contexts, and B2B compliance boundaries.
   - Added language matching for AI answers: the last user message decides Russian, English, or Kazakh output, with automatic repair if a model mixes languages.

@@ -62,3 +62,5 @@ supabase functions deploy ai-chat business-analysis admin-dashboard --use-api
 - `ai_request_logs` - prompt/response log, model, latency, source usage,
   product suggestions, safety flags, and errors.
 - `app_admins` - users allowed to call `admin-dashboard`.
+- `app_analytics_events` - privacy-conscious navigation, session, tab, and
+  feature usage events visible only through the admin dashboard.

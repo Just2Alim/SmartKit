@@ -1,6 +1,8 @@
 class ReminderModel {
   final String id;
   final String userId;
+  final String? familyId;
+  final String? createdByUserId;
   final String medicineId;
   final String? familyMemberId;
   final String title;
@@ -13,6 +15,8 @@ class ReminderModel {
   ReminderModel({
     required this.id,
     required this.userId,
+    this.familyId,
+    this.createdByUserId,
     required this.medicineId,
     this.familyMemberId,
     required this.title,
@@ -26,6 +30,8 @@ class ReminderModel {
   Map<String, dynamic> toMap() {
     return {
       'user_id': userId,
+      'family_id': familyId,
+      'created_by_user_id': createdByUserId,
       'medicine_id': medicineId,
       'family_member_id': familyMemberId,
       'title': title,
@@ -46,6 +52,8 @@ class ReminderModel {
     return ReminderModel(
       id: data['id'] ?? '',
       userId: data['user_id'] ?? data['userId'] ?? '',
+      familyId: data['family_id'] ?? data['familyId'],
+      createdByUserId: data['created_by_user_id'] ?? data['createdByUserId'],
       medicineId: data['medicine_id'] ?? data['medicineId'] ?? '',
       familyMemberId: data['family_member_id'] ?? data['familyMemberId'],
       title: data['title'] ?? '',
@@ -60,6 +68,8 @@ class ReminderModel {
   ReminderModel copyWith({
     String? id,
     String? userId,
+    String? familyId,
+    String? createdByUserId,
     String? medicineId,
     String? familyMemberId,
     String? title,
@@ -72,6 +82,8 @@ class ReminderModel {
     return ReminderModel(
       id: id ?? this.id,
       userId: userId ?? this.userId,
+      familyId: familyId ?? this.familyId,
+      createdByUserId: createdByUserId ?? this.createdByUserId,
       medicineId: medicineId ?? this.medicineId,
       familyMemberId: familyMemberId ?? this.familyMemberId,
       title: title ?? this.title,

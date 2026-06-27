@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/services/analytics_service.dart';
 import '../../../core/services/supabase_auth_service.dart';
 import '../models/app_user.dart';
 
@@ -49,6 +50,11 @@ class AuthRepository {
     if (role == 'b2b') {
       await _ensureOrganization(companyName ?? name ?? email, bin: bin);
     }
+    AnalyticsService.instance.trackFeature(
+      'auth',
+      action: 'signed_up',
+      properties: {'role': role},
+    );
   }
 
   Future<void> signIn({required String email, required String password}) async {
@@ -56,6 +62,7 @@ class AuthRepository {
   }
 
   Future<void> signOut() async {
+    AnalyticsService.instance.trackFeature('auth', action: 'signed_out');
     await _authService.signOut();
   }
 
@@ -121,6 +128,7 @@ class AuthRepository {
         email: email ?? appUser.email,
       );
       await _upsertProfile(updatedUser);
+      AnalyticsService.instance.trackFeature('profile', action: 'updated');
     }
   }
 
@@ -129,6 +137,10 @@ class AuthRepository {
         .from('profiles')
         .update({'is_dark_theme': isDark})
         .eq('id', id);
+    AnalyticsService.instance.trackFeature(
+      'theme',
+      action: isDark ? 'dark_enabled' : 'light_enabled',
+    );
   }
 
   Future<void> _upsertProfile(AppUser user) async {

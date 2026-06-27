@@ -21,6 +21,7 @@ class FamilyMemberMedicinesScreen extends StatelessWidget {
 
   Future<void> _recordIntake(
     BuildContext context,
+    FamilyMemberModel member,
     MedicineModel medicine,
   ) async {
     if (medicine.quantity <= 0) {
@@ -36,7 +37,11 @@ class FamilyMemberMedicinesScreen extends StatelessWidget {
       );
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Принято. Осталось ${result.quantityAfter}')),
+        SnackBar(
+          content: Text(
+            'Дали ${medicine.name} для ${member.name}. Осталось ${result.quantityAfter}',
+          ),
+        ),
       );
     } catch (e) {
       if (!context.mounted) return;
@@ -355,21 +360,39 @@ class FamilyMemberMedicinesScreen extends StatelessWidget {
                                               ),
                                             ),
                                             const SizedBox(height: 8),
-                                            Tooltip(
-                                              message: 'Отметить прием',
-                                              child: IconButton.filledTonal(
-                                                visualDensity:
-                                                    VisualDensity.compact,
+                                            SizedBox(
+                                              width: 112,
+                                              height: 38,
+                                              child: FilledButton.icon(
+                                                style: FilledButton.styleFrom(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 10,
+                                                      ),
+                                                  backgroundColor: accent,
+                                                  foregroundColor: Colors.white,
+                                                ),
                                                 onPressed:
                                                     medicine.quantity <= 0
                                                         ? null
                                                         : () => _recordIntake(
                                                           context,
+                                                          member,
                                                           medicine,
                                                         ),
                                                 icon: const Icon(
-                                                  Icons.check_rounded,
-                                                  size: 18,
+                                                  Icons.task_alt_rounded,
+                                                  size: 17,
+                                                ),
+                                                label: const Text(
+                                                  'Дать',
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w800,
+                                                  ),
                                                 ),
                                               ),
                                             ),

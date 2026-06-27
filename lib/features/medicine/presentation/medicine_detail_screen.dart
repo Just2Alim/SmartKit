@@ -112,7 +112,9 @@ class _MedicineDetailScreenState extends State<MedicineDetailScreen> {
       final result = await _repository.recordIntake(medicineId: medicine.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Принято. Осталось ${result.quantityAfter}')),
+        SnackBar(
+          content: Text('Отмечено для семьи. Осталось ${result.quantityAfter}'),
+        ),
       );
       setState(() {});
     } catch (e) {
@@ -422,9 +424,13 @@ class _MedicineDetailScreenState extends State<MedicineDetailScreen> {
               )
             else
               ...logs.take(5).map((log) {
+                final actor =
+                    (log.actorName ?? '').trim().isEmpty
+                        ? 'Кто-то из семьи'
+                        : log.actorName!.trim();
                 return _infoRow(
                   _formatDateTime(log.takenAt),
-                  '-${log.amount} ${medicine.unitLabel}',
+                  '-${log.amount} ${medicine.unitLabel} • $actor',
                 );
               }),
           ],

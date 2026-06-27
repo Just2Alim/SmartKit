@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/services/analytics_service.dart';
 import 'b2b_organization_resolver.dart';
 import 'b2b_activity_repository.dart';
 import '../models/b2b_activity_model.dart';
@@ -45,6 +46,11 @@ class B2BLocationsRepository {
         timestamp: DateTime.now(),
       ),
     );
+    AnalyticsService.instance.trackFeature(
+      'b2b_location',
+      action: 'created',
+      properties: {'type': location.type},
+    );
   }
 
   Future<void> updateLocation(B2BLocationModel location) async {
@@ -65,9 +71,11 @@ class B2BLocationsRepository {
         timestamp: DateTime.now(),
       ),
     );
+    AnalyticsService.instance.trackFeature('b2b_location', action: 'updated');
   }
 
   Future<void> deleteLocation(String id) async {
     await _client.from('b2b_locations').delete().eq('id', id);
+    AnalyticsService.instance.trackFeature('b2b_location', action: 'deleted');
   }
 }

@@ -34,7 +34,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -173,6 +174,24 @@ input {
   gap: 10px;
 }
 
+.period-control,
+.event-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.period-control select,
+.event-filter select {
+  min-height: 36px;
+  padding: 0 34px 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 800;
+}
+
 .status {
   display: inline-flex;
   align-items: center;
@@ -196,6 +215,10 @@ input {
   border-radius: 8px;
   background: var(--panel);
   box-shadow: var(--shadow);
+}
+
+#dashboard > .panel {
+  margin-bottom: 16px;
 }
 
 .panel-heading {
@@ -254,6 +277,172 @@ input:focus {
 .metrics-grid.compact {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-bottom: 0;
+}
+
+.analytics-panel {
+  margin-bottom: 16px;
+}
+
+.analytics-metrics {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.section-hint {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.chart-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-soft);
+}
+
+.chart-card.chart-wide {
+  grid-column: 1 / -1;
+}
+
+.chart-heading strong,
+.chart-heading span {
+  display: block;
+}
+
+.chart-heading span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.chart-wrap {
+  position: relative;
+  height: 250px;
+  margin-top: 14px;
+}
+
+.chart-wide .chart-wrap {
+  height: 300px;
+}
+
+.behavior-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.ranked-list {
+  display: grid;
+  gap: 8px;
+}
+
+.ranked-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ranked-row:last-child {
+  border-bottom: 0;
+}
+
+.ranked-label strong,
+.ranked-label span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.ranked-label span,
+.ranked-value span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ranked-value {
+  text-align: right;
+}
+
+.ranked-value strong {
+  font-size: 18px;
+}
+
+.data-table {
+  overflow-x: auto;
+}
+
+.data-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+  padding: 11px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.data-table th {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.data-table td:first-child {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.event-list {
+  display: grid;
+  gap: 10px;
+}
+
+.event-row {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-soft);
+}
+
+.event-user strong,
+.event-user span,
+.event-main strong,
+.event-main span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.event-user span,
+.event-main span,
+.event-time {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.event-properties {
+  margin-top: 7px;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .metric {
@@ -406,6 +595,10 @@ svg {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .analytics-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .layout-two {
     grid-template-columns: 1fr;
   }
@@ -428,9 +621,25 @@ svg {
     flex-direction: column;
   }
 
+  .top-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
   .setup-grid,
   .metrics-grid,
-  .metrics-grid.compact {
+  .metrics-grid.compact,
+  .analytics-metrics,
+  .chart-grid,
+  .behavior-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-card.chart-wide {
+    grid-column: auto;
+  }
+
+  .event-row {
     grid-template-columns: 1fr;
   }
 }

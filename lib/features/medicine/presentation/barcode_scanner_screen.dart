@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import '../../../core/services/analytics_service.dart';
 import '../../../core/services/barcode_service.dart';
 
 class BarcodeScannerScreen extends StatefulWidget {
@@ -73,10 +74,18 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
       Navigator.of(context).pop(); // Close loading dialog
 
       if (medicineInfo != null) {
+        AnalyticsService.instance.trackFeature(
+          'barcode_scanner',
+          action: 'catalog_match',
+        );
         debugPrint('DEBUG: Medicine found: ${medicineInfo['name']}');
         // Return result instead of navigating directly
         Navigator.pop(context, medicineInfo);
       } else {
+        AnalyticsService.instance.trackFeature(
+          'barcode_scanner',
+          action: 'manual_fallback',
+        );
         debugPrint('DEBUG: Medicine not found for barcode: $barcode');
         _showBarcodeDraftDialog(barcode);
       }

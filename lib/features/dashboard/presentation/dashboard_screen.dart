@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../family/data/family_repository.dart';
 import '../../family/models/family_member_model.dart';
 import '../../medicine/data/medicine_repository.dart';
+import '../../medicine/models/medicine_intake_log_model.dart';
 import '../../medicine/models/medicine_model.dart';
 import '../../b2b/inventory/data/b2b_inventory_repository.dart';
 import '../../b2b/inventory/models/b2b_inventory_model.dart';
@@ -13,12 +14,23 @@ import '../../reminders/data/reminder_repository.dart';
 import '../../reminders/models/reminder_model.dart';
 
 class DashboardScreen extends StatelessWidget {
-  DashboardScreen({super.key});
+  DashboardScreen({super.key, this.onOpenFamilyTab});
+
+  final VoidCallback? onOpenFamilyTab;
 
   final MedicineRepository _medicineRepository = MedicineRepository();
   final FamilyRepository _familyRepository = FamilyRepository();
   final ReminderRepository _reminderRepository = ReminderRepository();
   final B2BInventoryRepository _b2bRepository = B2BInventoryRepository();
+
+  void _openFamily(BuildContext context) {
+    final openTab = onOpenFamilyTab;
+    if (openTab != null) {
+      openTab();
+      return;
+    }
+    Navigator.pushNamed(context, AppRoutes.family);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -235,98 +247,108 @@ class DashboardScreen extends StatelessWidget {
             return StreamBuilder<List<FamilyMemberModel>>(
               stream: _familyRepository.getFamilyMembersByUser(user.id),
               builder: (context, familySnapshot) {
-                if (familySnapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
                 final familyMembers = familySnapshot.data ?? [];
 
-                return Column(
-                  children: [
-                    Row(
+                return StreamBuilder<List<MedicineIntakeLogModel>>(
+                  stream: _medicineRepository.getFamilyIntakeLogs(),
+                  builder: (context, intakeSnapshot) {
+                    final today = DateTime.now().subtract(
+                      const Duration(hours: 24),
+                    );
+                    final recentIntakeCount =
+                        (intakeSnapshot.data ?? [])
+                            .where((log) => log.takenAt.isAfter(today))
+                            .length;
+                    final totalNotifications =
+                        notificationsCount + recentIntakeCount;
+
+                    return Column(
                       children: [
-                        Expanded(
-                          child: _statCard(
-                            context: context,
-                            title: 'Лекарства',
-                            value: totalItemsCount.toString(),
-                            subtitle: 'всего позиций',
-                            colors: const [
-                              Color(0xFF60A5FA),
-                              Color(0xFF2563EB),
-                            ],
-                            icon: Icons.medication_rounded,
-                            onTap:
-                                () => Navigator.pushNamed(
-                                  context,
-                                  AppRoutes.search,
-                                ),
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _statCard(
+                                context: context,
+                                title: 'Лекарства',
+                                value: totalItemsCount.toString(),
+                                subtitle: 'всего позиций',
+                                colors: const [
+                                  Color(0xFF60A5FA),
+                                  Color(0xFF2563EB),
+                                ],
+                                icon: Icons.medication_rounded,
+                                onTap:
+                                    () => Navigator.pushNamed(
+                                      context,
+                                      AppRoutes.search,
+                                    ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _statCard(
+                                context: context,
+                                title: 'Уведомления',
+                                value: totalNotifications.toString(),
+                                subtitle:
+                                    recentIntakeCount > 0
+                                        ? 'включая выдачи'
+                                        : 'важных',
+                                colors: const [
+                                  Color(0xFFA78BFA),
+                                  Color(0xFF7C3AED),
+                                ],
+                                icon: Icons.notifications_active_rounded,
+                                onTap:
+                                    () => Navigator.pushNamed(
+                                      context,
+                                      AppRoutes.notifications,
+                                    ),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _statCard(
-                            context: context,
-                            title: 'Уведомления',
-                            value: notificationsCount.toString(),
-                            subtitle: 'важных',
-                            colors: const [
-                              Color(0xFFA78BFA),
-                              Color(0xFF7C3AED),
-                            ],
-                            icon: Icons.notifications_active_rounded,
-                            onTap:
-                                () => Navigator.pushNamed(
-                                  context,
-                                  AppRoutes.notifications,
-                                ),
-                          ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _statCard(
+                                context: context,
+                                title: 'Семья',
+                                value: familyMembers.length.toString(),
+                                subtitle: 'профилей',
+                                colors: const [
+                                  Color(0xFF34D399),
+                                  Color(0xFF059669),
+                                ],
+                                icon: Icons.group_rounded,
+                                onTap: () => _openFamily(context),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _statCard(
+                                context: context,
+                                title: 'Мало остатка',
+                                value: lowStockCount.toString(),
+                                subtitle: 'лекарств',
+                                colors: const [
+                                  Color(0xFFF59E0B),
+                                  Color(0xFFEA580C),
+                                ],
+                                icon: Icons.inventory_2_outlined,
+                                onTap:
+                                    () => Navigator.pushNamed(
+                                      context,
+                                      AppRoutes.search,
+                                    ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _statCard(
-                            context: context,
-                            title: 'Семья',
-                            value: familyMembers.length.toString(),
-                            subtitle: 'профилей',
-                            colors: const [
-                              Color(0xFF34D399),
-                              Color(0xFF059669),
-                            ],
-                            icon: Icons.group_rounded,
-                            onTap:
-                                () => Navigator.pushNamed(
-                                  context,
-                                  AppRoutes.family,
-                                ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _statCard(
-                            context: context,
-                            title: 'Мало остатка',
-                            value: lowStockCount.toString(),
-                            subtitle: 'лекарств',
-                            colors: const [
-                              Color(0xFFF59E0B),
-                              Color(0xFFEA580C),
-                            ],
-                            icon: Icons.inventory_2_outlined,
-                            onTap:
-                                () => Navigator.pushNamed(
-                                  context,
-                                  AppRoutes.search,
-                                ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                    );
+                  },
                 );
               },
             );
@@ -478,6 +500,8 @@ class DashboardScreen extends StatelessWidget {
           onTap: () async {
             if (item.$5 == AppRoutes.addMedicine) {
               _showAddMedicineSelection(context);
+            } else if (item.$5 == AppRoutes.family) {
+              _openFamily(context);
             } else {
               Navigator.pushNamed(context, item.$5);
             }

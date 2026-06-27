@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/analytics_service.dart';
+
 class CartProvider extends ChangeNotifier {
   static final CartProvider instance = CartProvider._internal();
   CartProvider._internal() {
@@ -125,6 +127,11 @@ class CartProvider extends ChangeNotifier {
 
     _saveCart();
     notifyListeners();
+    AnalyticsService.instance.trackFeature(
+      'cart',
+      action: 'item_added',
+      properties: {'quantity': quantity, 'item_count': itemCount},
+    );
   }
 
   void addItems(Iterable<Map<String, dynamic>> items) {
@@ -145,6 +152,11 @@ class CartProvider extends ChangeNotifier {
 
     _saveCart();
     notifyListeners();
+    AnalyticsService.instance.trackFeature(
+      'cart',
+      action: 'items_added',
+      properties: {'item_count': itemCount},
+    );
   }
 
   void incrementItem(int index) {
@@ -152,6 +164,11 @@ class CartProvider extends ChangeNotifier {
       _items[index]['quantity'] = _quantityOf(_items[index]) + 1;
       _saveCart();
       notifyListeners();
+      AnalyticsService.instance.trackFeature(
+        'cart',
+        action: 'quantity_increased',
+        properties: {'item_count': itemCount},
+      );
     }
   }
 
@@ -165,6 +182,11 @@ class CartProvider extends ChangeNotifier {
       }
       _saveCart();
       notifyListeners();
+      AnalyticsService.instance.trackFeature(
+        'cart',
+        action: 'quantity_decreased',
+        properties: {'item_count': itemCount},
+      );
     }
   }
 
@@ -173,6 +195,11 @@ class CartProvider extends ChangeNotifier {
       _items.removeAt(index);
       _saveCart();
       notifyListeners();
+      AnalyticsService.instance.trackFeature(
+        'cart',
+        action: 'item_removed',
+        properties: {'item_count': itemCount},
+      );
     }
   }
 
