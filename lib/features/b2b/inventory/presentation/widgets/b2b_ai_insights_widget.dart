@@ -41,7 +41,7 @@ class _B2BAiInsightsWidgetState extends State<B2BAiInsightsWidget> {
         widget.sales,
         widget.locations,
       );
-      final result = await B2BAiService.instance.getQuickBusinessAnalysis();
+      final result = await B2BAiService.instance.getFullBusinessAnalysis();
       if (!mounted) return;
       setState(() {
         _analysis = result;

@@ -1,7 +1,6 @@
 class AiRuntimeConfig {
-  static const Duration backendTimeout = Duration(seconds: 7);
-  static const Duration localTimeout = Duration(seconds: 12);
-  static const Duration repairTimeout = Duration(seconds: 5);
+  static const Duration localTimeout = Duration(seconds: 45);
+  static const Duration repairTimeout = Duration(seconds: 20);
 
   static Map<String, dynamic> ollamaOptions({
     required String userText,
@@ -101,9 +100,9 @@ class AiRuntimeConfig {
   }) {
     if (repair) return 360;
     final length = userText.trim().length;
-    if (length <= 80) return business ? 260 : 320;
-    if (length <= 220) return business ? 420 : 560;
-    return business ? 720 : 900;
+    if (length <= 80) return business ? 520 : 520;
+    if (length <= 220) return business ? 900 : 760;
+    return business ? 1500 : 1200;
   }
 
   static String _trim(String value, int limit) {

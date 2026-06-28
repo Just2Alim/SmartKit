@@ -6,7 +6,7 @@ const ollamaBaseUrl = process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11435';
 const proxyToken = process.env.OLLAMA_PROXY_TOKEN ?? '';
 const ollamaKeepAlive = process.env.OLLAMA_KEEP_ALIVE ?? '24h';
 const maxNumCtx = envInt('OLLAMA_PROXY_NUM_CTX_MAX', 4096);
-const maxNumPredict = envInt('OLLAMA_PROXY_NUM_PREDICT_MAX', 1200);
+const maxNumPredict = envInt('OLLAMA_PROXY_NUM_PREDICT_MAX', 1800);
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',

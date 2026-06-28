@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/b2b/inventory/models/b2b_inventory_model.dart';
 import '../../features/b2b/inventory/models/b2b_sale_model.dart';
 import '../../features/b2b/inventory/models/b2b_location_model.dart';
+import '../../features/b2b/inventory/data/b2b_organization_resolver.dart';
 import '../api/smartkit_api_client.dart';
 import 'ai_runtime_config.dart';
 import 'ai_safety.dart';
@@ -98,7 +99,11 @@ class B2BAiService {
     return _quickBusinessAnalysis(AiResponseLanguage.russian);
   }
 
-  Future<String> sendMessage(String text) async {
+  Future<String> getFullBusinessAnalysis() {
+    return sendMessage(_fullBusinessAnalysisPrompt, forceRemote: true);
+  }
+
+  Future<String> sendMessage(String text, {bool forceRemote = false}) async {
     final safetyDecision = AiSafety.screenBusinessRequest(text);
     if (safetyDecision != null) {
       return safetyDecision.response;
@@ -109,7 +114,7 @@ class B2BAiService {
     }
 
     final promptText = AiSafety.wrapUserMessageWithLanguageInstruction(text);
-    final localResponse = _preflightBusinessResponse(text);
+    final localResponse = forceRemote ? null : _preflightBusinessResponse(text);
     if (localResponse != null) {
       AiRuntimeConfig.remember(_history, 'user', promptText);
       AiRuntimeConfig.remember(_history, 'assistant', localResponse);
@@ -119,9 +124,7 @@ class B2BAiService {
     try {
       AiRuntimeConfig.remember(_history, 'user', promptText);
 
-      final backendResponse = await _sendViaBackend(
-        text,
-      ).timeout(AiRuntimeConfig.backendTimeout, onTimeout: () => null);
+      final backendResponse = await _sendViaBackend(text);
       if (backendResponse != null && backendResponse.trim().isNotEmpty) {
         var responseText = backendResponse.trim();
         if (AiSafety.appearsToUseDifferentLanguage(responseText, text)) {
@@ -129,6 +132,10 @@ class B2BAiService {
         }
         AiRuntimeConfig.remember(_history, 'assistant', responseText);
         return responseText;
+      }
+
+      if (!_shouldTryDirectOllama) {
+        return _offlineBusinessResponse(text);
       }
 
       for (final endpoint in _candidateBaseUrls) {
@@ -144,6 +151,7 @@ class B2BAiService {
                     systemLimit: 2400,
                     recentMessages: 5,
                   ),
+                  'think': false,
                   'stream': false,
                   'options': AiRuntimeConfig.ollamaOptions(
                     userText: text,
@@ -218,6 +226,7 @@ class B2BAiService {
                   ),
                 },
               ],
+              'think': false,
               'stream': false,
               'options': AiRuntimeConfig.ollamaOptions(
                 userText: userText,
@@ -239,12 +248,15 @@ class B2BAiService {
   }
 
   Future<String?> _sendViaBackend(String text) async {
-    final organizationId = _currentOrganizationId;
-    final accessToken =
-        Supabase.instance.client.auth.currentSession?.accessToken;
-    if (organizationId == null || accessToken == null) return null;
-
     try {
+      String? organizationId = _currentOrganizationId;
+      final accessToken =
+          Supabase.instance.client.auth.currentSession?.accessToken;
+      if (accessToken == null) return null;
+
+      organizationId ??= await B2BOrganizationResolver()
+          .resolveForUserOrOrganization('');
+
       final response = await SmartKitApiClient().postJson(
         'business-analysis',
         accessToken: accessToken,
@@ -354,6 +366,31 @@ class B2BAiService {
 
     return {...preferred, ..._baseUrls.take(2)}.toList();
   }
+
+  bool get _shouldTryDirectOllama {
+    if (kIsWeb) return true;
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return kDebugMode;
+    }
+    return true;
+  }
+
+  static const String _fullBusinessAnalysisPrompt = '''
+Сформируй полный B2B-отчет по аптеке/складу на русском языке.
+
+Не выдавай шаблонную сводку. Используй реальные товары, остатки, сроки, продажи, локации и B2C-спрос, которые доступны серверу SmartKit.
+
+Структура:
+1. Executive summary: что происходит с бизнесом сейчас.
+2. Критичные риски сегодня: просрочка, сроки до 45 дней, низкие остатки, перегруженные локации.
+3. Что докупить: конкретные товары и примерные количества, исходя из min stock, продаж и спроса.
+4. Что продвигать в каталоге B2C, а что не продвигать из-за срока/комплаенс-риска.
+5. План действий на 24 часа.
+6. План действий на 7 дней.
+7. Какие данные стоит начать собирать, чтобы прогноз стал точнее.
+
+Пиши как живой аптечный бизнес-аналитик: конкретно, с приоритетами, без обещаний прибыли и без медицинских назначений пациентам.
+''';
 
   String _topBusinessAlert(AiResponseLanguage language) {
     final lowStock = _lowStockItems();

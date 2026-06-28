@@ -323,7 +323,7 @@ Deno.serve(async (request) => {
         temperature: 0.05,
         numPredict: 420,
         numCtx: 4096,
-        timeoutMs: 10000,
+        timeoutMs: 0,
       });
       aiDraft = parseJsonObject(content);
     } catch (_) {

@@ -383,9 +383,9 @@ Deno.serve(async (request) => {
           { role: "user", content: prompt },
         ],
         temperature: 0.18,
-        numPredict: prompt.length < 180 ? 900 : 1200,
+        numPredict: prompt.length < 180 ? 1200 : 1800,
         numCtx: 4096,
-        timeoutMs: 25000,
+        timeoutMs: 0,
       });
     } catch (_) {
       fallback = true;

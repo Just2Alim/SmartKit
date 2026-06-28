@@ -52,14 +52,14 @@ export async function sendOllamaChat({
   messages,
   model,
   temperature = 0.25,
-  numPredict = 700,
-  numCtx = 3072,
-  timeoutMs = 12000,
+  numPredict = 900,
+  numCtx = 4096,
+  timeoutMs = 0,
 }: OllamaChatOptions): Promise<string> {
   const baseUrl = Deno.env.get("OLLAMA_BASE_URL") ?? "http://localhost:11434";
   const selectedModel = model ?? Deno.env.get("OLLAMA_MODEL") ?? "qwen3:latest";
   const apiKey = Deno.env.get("OLLAMA_API_KEY");
-  const maxPredict = envNumber("OLLAMA_NUM_PREDICT_MAX", 1200);
+  const maxPredict = envNumber("OLLAMA_NUM_PREDICT_MAX", 1800);
   const maxCtx = envNumber("OLLAMA_NUM_CTX_MAX", 4096);
   const effectiveMessages = compactMessages(messages);
   const lastUserIndex = effectiveMessages.findLastIndex((message) =>
@@ -76,6 +76,7 @@ export async function sendOllamaChat({
     };
   });
 
+  const signal = timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined;
   const response = await fetch(`${baseUrl.replace(/\/$/, "")}/api/chat`, {
     method: "POST",
     headers: {
@@ -85,6 +86,7 @@ export async function sendOllamaChat({
     body: JSON.stringify({
       model: selectedModel,
       messages: optimizedMessages,
+      think: false,
       stream: false,
       keep_alive: Deno.env.get("OLLAMA_KEEP_ALIVE") ?? "24h",
       options: {
@@ -95,7 +97,7 @@ export async function sendOllamaChat({
         repeat_penalty: 1.08,
       },
     }),
-    signal: AbortSignal.timeout(timeoutMs),
+    ...(signal ? { signal } : {}),
   });
 
   if (!response.ok) {

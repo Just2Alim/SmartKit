@@ -69,7 +69,7 @@ class OllamaService implements AiService {
       final backendResponse = await _sendViaBackend(
         userText: text,
         threadId: threadId,
-      ).timeout(AiRuntimeConfig.backendTimeout, onTimeout: () => null);
+      );
       if (backendResponse != null &&
           backendResponse.message.trim().isNotEmpty) {
         var safeResponse = _appendSafetyIfNeeded(
@@ -83,6 +83,13 @@ class OllamaService implements AiService {
         return backendResponse.copyWith(message: safeResponse);
       }
 
+      if (!_shouldTryDirectOllama) {
+        return AiChatResult(
+          message: _offlineResponse(text),
+          threadId: threadId,
+        );
+      }
+
       for (final endpoint in _candidateBaseUrls) {
         try {
           final response = await http
@@ -92,6 +99,7 @@ class OllamaService implements AiService {
                 body: jsonEncode({
                   'model': _model,
                   'messages': AiRuntimeConfig.compactMessages(_history),
+                  'think': false,
                   'stream': false,
                   'options': AiRuntimeConfig.ollamaOptions(
                     userText: text,
@@ -173,6 +181,7 @@ class OllamaService implements AiService {
                   ),
                 },
               ],
+              'think': false,
               'stream': false,
               'options': AiRuntimeConfig.ollamaOptions(
                 userText: userText,
@@ -241,6 +250,14 @@ class OllamaService implements AiService {
     }
 
     return {...preferred, ..._baseUrls.take(2)}.toList();
+  }
+
+  bool get _shouldTryDirectOllama {
+    if (kIsWeb) return true;
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return kDebugMode;
+    }
+    return true;
   }
 
   String? _preflightLocalResponse(String text) {
@@ -338,6 +355,7 @@ class OllamaService implements AiService {
 
     if (AiSafety.mentionsSymptoms(text)) {
       buffer.writeln(_symptomFallbackLine(language));
+      buffer.writeln(_symptomSafeOptionsLine(lower, language));
       buffer.writeln(_symptomChecklistLine(language));
       buffer.writeln(_doctorEscalationLine(language));
       buffer.writeln('\n${AiSafety.medicalCaveatForLanguage(language)}');
@@ -357,6 +375,7 @@ class OllamaService implements AiService {
 
     if (AiSafety.mentionsSymptoms(text)) {
       buffer.writeln(_symptomFallbackLine(language));
+      buffer.writeln(_symptomSafeOptionsLine(text.toLowerCase(), language));
       buffer.writeln(_doctorEscalationLine(language));
       buffer.writeln('\n${AiSafety.medicalCaveatForLanguage(language)}');
       return buffer.toString();
@@ -640,6 +659,156 @@ class OllamaService implements AiService {
         return 'Check temperature, symptom duration, age, allergies, pregnancy/breastfeeding, chronic conditions, and medicines already taken.';
       case AiResponseLanguage.kazakh:
         return 'Дене қызуын, симптом ұзақтығын, жасты, аллергияны, жүктілік/емізуді, созылмалы ауруларды және бұрын қабылданған дәрілерді тексеріңіз.';
+    }
+  }
+
+  String _symptomSafeOptionsLine(String lower, AiResponseLanguage language) {
+    final options = <String>[];
+    void add(String value) {
+      if (!options.contains(value)) options.add(value);
+    }
+
+    final painOrFever =
+        lower.contains('голов') ||
+        lower.contains('боль') ||
+        lower.contains('болит') ||
+        lower.contains('температур') ||
+        lower.contains('жар') ||
+        lower.contains('fever') ||
+        lower.contains('headache') ||
+        lower.contains('pain');
+    final allergy =
+        lower.contains('аллерг') ||
+        lower.contains('сып') ||
+        lower.contains('зуд') ||
+        lower.contains('насморк') ||
+        lower.contains('allergy') ||
+        lower.contains('rash') ||
+        lower.contains('itch');
+    final stomach =
+        lower.contains('живот') ||
+        lower.contains('диаре') ||
+        lower.contains('понос') ||
+        lower.contains('тошн') ||
+        lower.contains('изжог') ||
+        lower.contains('stomach') ||
+        lower.contains('diarrhea') ||
+        lower.contains('nausea') ||
+        lower.contains('heartburn');
+    final cold =
+        lower.contains('каш') ||
+        lower.contains('горл') ||
+        lower.contains('простуд') ||
+        lower.contains('насморк') ||
+        lower.contains('cough') ||
+        lower.contains('throat') ||
+        lower.contains('cold');
+    final wound =
+        lower.contains('рана') ||
+        lower.contains('порез') ||
+        lower.contains('ожог') ||
+        lower.contains('ссад') ||
+        lower.contains('wound') ||
+        lower.contains('cut') ||
+        lower.contains('burn');
+
+    switch (language) {
+      case AiResponseLanguage.russian:
+        if (painOrFever) {
+          add(
+            'Можно рассмотреть безрецептурные категории: парацетамол/ацетаминофен или ибупрофен, если нет противопоказаний; дозировку брать только из инструкции конкретного препарата.',
+          );
+        }
+        if (allergy) {
+          add(
+            'При легких аллергических симптомах можно смотреть антигистаминные безрецептурные средства и солевой раствор для носа; не смешивайте несколько антигистаминных без назначения.',
+          );
+        }
+        if (stomach) {
+          add(
+            'Для ЖКТ можно рассмотреть оральную регидратацию, сорбент/диосмектит или средство от изжоги по инструкции, в зависимости от симптома.',
+          );
+        }
+        if (cold) {
+          add(
+            'При простуде можно проверить солевой спрей/промывание носа, пастилки/местные средства для горла, жаропонижающее при температуре и муколитик только при влажном кашле.',
+          );
+        }
+        if (wound) {
+          add(
+            'Для ран и ожогов проверьте антисептик для кожи, стерильную повязку/пластырь; ожог охлаждают прохладной проточной водой, без льда и масел.',
+          );
+        }
+        if (options.isEmpty) {
+          add(
+            'Можно начать с безопасной проверки: что именно беспокоит, сколько длится, возраст, аллергии, беременность/ГВ, хронические болезни и что уже есть в аптечке.',
+          );
+        }
+        return options.take(3).join('\n');
+      case AiResponseLanguage.english:
+        if (painOrFever) {
+          add(
+            'You can consider OTC categories such as acetaminophen/paracetamol or ibuprofen if there are no contraindications; use only the leaflet dose for the exact product.',
+          );
+        }
+        if (allergy) {
+          add(
+            'For mild allergy symptoms, consider OTC antihistamine categories and saline nasal spray; do not combine several antihistamines without advice.',
+          );
+        }
+        if (stomach) {
+          add(
+            'For GI symptoms, consider oral rehydration, a sorbent/diosmectite, or an antacid/heartburn product according to the leaflet and symptom.',
+          );
+        }
+        if (cold) {
+          add(
+            'For cold symptoms, check saline spray/rinse, throat lozenges/local throat products, fever reducer when needed, and expectorant/mucolytic only for wet cough.',
+          );
+        }
+        if (wound) {
+          add(
+            'For wounds or burns, check a skin antiseptic and sterile dressing/plaster; cool burns with cool running water, not ice or oils.',
+          );
+        }
+        if (options.isEmpty) {
+          add(
+            'Start with safe checks: symptom, duration, age, allergies, pregnancy/breastfeeding, chronic conditions, and what is already in the kit.',
+          );
+        }
+        return options.take(3).join('\n');
+      case AiResponseLanguage.kazakh:
+        if (painOrFever) {
+          add(
+            'Қарсы көрсетілім болмаса, парацетамол/ацетаминофен немесе ибупрофен сияқты рецептісіз санаттарды қарастыруға болады; дозаны нақты препарат нұсқаулығынан ғана алыңыз.',
+          );
+        }
+        if (allergy) {
+          add(
+            'Жеңіл аллергияда рецептісіз антигистамин санаттарын және мұрынға тұзды ерітіндіні қарастыруға болады; бірнеше антигистаминді қатар қолданбаңыз.',
+          );
+        }
+        if (stomach) {
+          add(
+            'Асқазан-ішек белгілерінде оральды регидратация, сорбент/диосмектит немесе қыжылға қарсы құралды нұсқаулық бойынша қарастыруға болады.',
+          );
+        }
+        if (cold) {
+          add(
+            'Суық тиюде тұзды спрей/шаю, тамаққа арналған жергілікті құралдар, қызуда қызу түсіретін санат және тек ылғалды жөтелде муколитикті тексеріңіз.',
+          );
+        }
+        if (wound) {
+          add(
+            'Жара/күйікте теріге арналған антисептик, стерильді таңғыш/пластырь тексеріңіз; күйікті мұзсыз және майсыз салқын ағын сумен салқындатыңыз.',
+          );
+        }
+        if (options.isEmpty) {
+          add(
+            'Алдымен қауіпсіз деректерді тексеріңіз: белгі, ұзақтығы, жас, аллергия, жүктілік/емізу, созылмалы аурулар және қобдишада не бар.',
+          );
+        }
+        return options.take(3).join('\n');
     }
   }
 

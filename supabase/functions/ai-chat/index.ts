@@ -916,9 +916,9 @@ Deno.serve(async (request) => {
         messages: modelMessages,
         temperature:
           typeof body.temperature === "number" ? body.temperature : 0.22,
-        numPredict: userText.length < 180 ? 650 : 1000,
+        numPredict: userText.length < 180 ? 900 : 1400,
         numCtx: 4096,
-        timeoutMs: 20000,
+        timeoutMs: 0,
       });
     } catch (error) {
       modelError = error instanceof Error ? error.message : "Ollama unavailable";

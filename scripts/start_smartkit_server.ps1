@@ -43,7 +43,7 @@ $proxyToken = Require-EnvValue $envValues "OLLAMA_PROXY_TOKEN"
 $model = EnvValueOrDefault $envValues "OLLAMA_MODEL" "qwen3:latest"
 $keepAlive = EnvValueOrDefault $envValues "OLLAMA_KEEP_ALIVE" "24h"
 $numCtxMax = EnvValueOrDefault $envValues "OLLAMA_NUM_CTX_MAX" "4096"
-$numPredictMax = EnvValueOrDefault $envValues "OLLAMA_NUM_PREDICT_MAX" "1200"
+$numPredictMax = EnvValueOrDefault $envValues "OLLAMA_NUM_PREDICT_MAX" "1800"
 $systemMax = EnvValueOrDefault $envValues "OLLAMA_SYSTEM_MAX" "5500"
 $messageMax = EnvValueOrDefault $envValues "OLLAMA_MESSAGE_MAX" "900"
 
