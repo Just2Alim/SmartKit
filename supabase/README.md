@@ -29,6 +29,7 @@ workflows.
 Initial server-side functions are included in `supabase/functions`:
 
 - `health` - deployment smoke test.
+- `medicine-ocr` - structured medicine/package OCR text parser for app scans.
 - `ai-chat` - Ollama/Qwen3 chat gateway with persistent `chat_threads`,
   `chat_messages`, medical reference context, product suggestions, and
   `ai_request_logs` observability.
@@ -52,7 +53,7 @@ Deploy example:
 
 ```bash
 supabase functions deploy health --use-api --no-verify-jwt
-supabase functions deploy ai-chat business-analysis admin-dashboard --use-api
+supabase functions deploy ai-chat business-analysis admin-dashboard medicine-ocr --use-api
 ```
 
 ## AI observability tables

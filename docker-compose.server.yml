@@ -7,7 +7,7 @@ services:
       OLLAMA_ORIGINS: "*"
       OLLAMA_FLASH_ATTENTION: "1"
       OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-24h}
-      OLLAMA_CONTEXT_LENGTH: ${OLLAMA_NUM_CTX_MAX:-1024}
+      OLLAMA_CONTEXT_LENGTH: ${OLLAMA_NUM_CTX_MAX:-4096}
       OLLAMA_MAX_LOADED_MODELS: "1"
       OLLAMA_NUM_PARALLEL: "1"
       OLLAMA_LOAD_TIMEOUT: 10m
@@ -51,9 +51,8 @@ services:
               {role: 'user', content: 'OK'}
             ],
             stream: false,
-            think: false,
             keep_alive: '24h',
-            options: {num_predict: 96, num_ctx: 1024, temperature: 0}
+            options: {num_predict: 64, num_ctx: 2048, temperature: 0}
           })
         }).then((response) => {
           if (!response.ok) throw new Error('warmup failed: ' + response.status);
@@ -76,8 +75,8 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_PROXY_TOKEN: ${OLLAMA_PROXY_TOKEN}
       OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-24h}
-      OLLAMA_PROXY_NUM_CTX_MAX: ${OLLAMA_NUM_CTX_MAX:-1024}
-      OLLAMA_PROXY_NUM_PREDICT_MAX: ${OLLAMA_NUM_PREDICT_MAX:-80}
+      OLLAMA_PROXY_NUM_CTX_MAX: ${OLLAMA_NUM_CTX_MAX:-4096}
+      OLLAMA_PROXY_NUM_PREDICT_MAX: ${OLLAMA_NUM_PREDICT_MAX:-1200}
     volumes:
       - ./scripts:/app/scripts:ro
     depends_on:

@@ -38,12 +38,12 @@ function compactMessages(messages: ChatMessage[]): ChatMessage[] {
     ...(system
       ? [{
         ...system,
-        content: compactText(system.content, envNumber("OLLAMA_SYSTEM_MAX", 1000)),
+        content: compactText(system.content, envNumber("OLLAMA_SYSTEM_MAX", 5500)),
       }]
       : []),
     ...recent.map((message) => ({
       ...message,
-      content: compactText(message.content, envNumber("OLLAMA_MESSAGE_MAX", 360)),
+      content: compactText(message.content, envNumber("OLLAMA_MESSAGE_MAX", 900)),
     })),
   ];
 }
@@ -59,8 +59,8 @@ export async function sendOllamaChat({
   const baseUrl = Deno.env.get("OLLAMA_BASE_URL") ?? "http://localhost:11434";
   const selectedModel = model ?? Deno.env.get("OLLAMA_MODEL") ?? "qwen3:latest";
   const apiKey = Deno.env.get("OLLAMA_API_KEY");
-  const maxPredict = envNumber("OLLAMA_NUM_PREDICT_MAX", 80);
-  const maxCtx = envNumber("OLLAMA_NUM_CTX_MAX", 1024);
+  const maxPredict = envNumber("OLLAMA_NUM_PREDICT_MAX", 1200);
+  const maxCtx = envNumber("OLLAMA_NUM_CTX_MAX", 4096);
   const effectiveMessages = compactMessages(messages);
   const lastUserIndex = effectiveMessages.findLastIndex((message) =>
     message.role === "user"
@@ -72,7 +72,7 @@ export async function sendOllamaChat({
     return {
       ...message,
       content:
-        `${message.content}\n\n/no_think\nAnswer in the user's language. Keep it concise: 3-5 short bullets, under 700 characters.`,
+        `${message.content}\n\n/no_think\nAnswer in the user's language. Be concrete, structured, and do not include hidden reasoning.`,
     };
   });
 
@@ -86,7 +86,6 @@ export async function sendOllamaChat({
       model: selectedModel,
       messages: optimizedMessages,
       stream: false,
-      think: false,
       keep_alive: Deno.env.get("OLLAMA_KEEP_ALIVE") ?? "24h",
       options: {
         temperature,

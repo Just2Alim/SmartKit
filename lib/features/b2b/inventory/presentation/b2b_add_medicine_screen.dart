@@ -358,26 +358,28 @@ class _B2BAddMedicineScreenState extends State<B2BAddMedicineScreen> {
       return;
     }
 
-    final stock = int.tryParse(stockCtrl.text.trim());
-    final minStock = int.tryParse(minStockCtrl.text.trim());
-    final price = int.tryParse(priceCtrl.text.trim());
-
-    if (nameCtrl.text.trim().isEmpty ||
-        stockCtrl.text.trim().isEmpty ||
-        minStockCtrl.text.trim().isEmpty ||
-        priceCtrl.text.trim().isEmpty) {
-      _showSnack('Заполните название, остаток, минимум и цену');
+    if (nameCtrl.text.trim().isEmpty) {
+      _showSnack('Укажите название товара');
       return;
     }
 
-    if (stock == null || minStock == null || price == null) {
-      _showSnack('Остаток, минимум и цена должны быть числами');
-      return;
-    }
+    final stock = int.tryParse(stockCtrl.text.trim()) ?? 1;
+    final minStock = int.tryParse(minStockCtrl.text.trim()) ?? 4;
+    final price = int.tryParse(priceCtrl.text.trim()) ?? 0;
 
     if (stock < 0 || minStock < 0 || price < 0) {
       _showSnack('Числовые значения не могут быть отрицательными');
       return;
+    }
+
+    if (stockCtrl.text.trim().isEmpty ||
+        minStockCtrl.text.trim().isEmpty ||
+        priceCtrl.text.trim().isEmpty) {
+      setState(() {
+        stockCtrl.text = stock.toString();
+        minStockCtrl.text = minStock.toString();
+        priceCtrl.text = price.toString();
+      });
     }
 
     setState(() => isLoading = true);
@@ -741,7 +743,7 @@ class _B2BAddMedicineScreenState extends State<B2BAddMedicineScreen> {
                         _textField(
                           label: 'Цена, ₸',
                           controller: priceCtrl,
-                          hint: 'Например: 2500',
+                          hint: 'Например: 2500 или 0, если заполните позже',
                           keyboardType: TextInputType.number,
                         ),
                       ],

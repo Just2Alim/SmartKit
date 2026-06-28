@@ -2,6 +2,17 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { jsonResponse, preflightResponse } from "../_shared/cors.ts";
 import { sendOllamaChat } from "../_shared/ollama.ts";
+import {
+  aggregateDemandSignals,
+  CarePlaybook,
+  DemandSignal,
+  detectCarePlaybooks,
+  detectEmergencyFlags,
+  formatDemandSignals,
+  formatPlaybookContext,
+  playbookTerms,
+  scoreTextForPlaybooks,
+} from "../_shared/medical_playbook.ts";
 
 type ChatMessage = {
   role: "system" | "user" | "assistant";
@@ -135,7 +146,11 @@ function isRestrictedProduct(product: CatalogRow): boolean {
   ].some((keyword) => text.includes(keyword));
 }
 
-function scoreProduct(product: CatalogRow, queryWords: string[]): number {
+function scoreProduct(
+  product: CatalogRow,
+  queryWords: string[],
+  playbooks: CarePlaybook[] = [],
+): number {
   const haystack = [
     product.name,
     product.category,
@@ -148,6 +163,8 @@ function scoreProduct(product: CatalogRow, queryWords: string[]): number {
     .replace(/ё/g, "е");
 
   let score = 0;
+  score += scoreTextForPlaybooks(haystack, playbooks);
+
   for (const word of queryWords) {
     if (haystack.includes(word)) score += word.length > 5 ? 3 : 1;
   }
@@ -216,6 +233,128 @@ function productSuggestion(product: CatalogRow) {
       updatedAt: product.updated_at,
     },
   };
+}
+
+function medicineContextText(value: Record<string, unknown>): string {
+  return [
+    value.name,
+    value.category,
+    value.dosage,
+    value.notes,
+  ]
+    .filter((part) => part !== null && part !== undefined)
+    .join(" ")
+    .toLowerCase()
+    .replace(/ё/g, "е");
+}
+
+function matchingHomeMedicines(
+  homeMedicines: Array<Record<string, unknown>>,
+  queryWords: string[],
+  playbooks: CarePlaybook[],
+): Array<Record<string, unknown>> {
+  const terms = [...new Set([...queryWords, ...playbookTerms(playbooks)])]
+    .map((term) => term.toLowerCase().replace(/ё/g, "е"))
+    .filter((term) => term.length >= 3);
+
+  if (!terms.length) return [];
+
+  return homeMedicines
+    .map((medicine) => {
+      const haystack = medicineContextText(medicine);
+      const score = terms.reduce(
+        (sum, term) => sum + (haystack.includes(term) ? 1 : 0),
+        0,
+      ) + scoreTextForPlaybooks(haystack, playbooks);
+      return { medicine, score };
+    })
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
+    .map((entry) => entry.medicine);
+}
+
+function formatHomeMatches(matches: Array<Record<string, unknown>>): string {
+  if (!matches.length) {
+    return "Явных совпадений в домашней аптечке не найдено.";
+  }
+  return matches
+    .map((m) =>
+      `• ${m.name ?? ""} ${m.dosage ?? ""}, ${m.category ?? ""}, qty=${m.quantity ?? 0}, expiry=${m.expiry_date ?? "не указан"}`
+    )
+    .join("\n");
+}
+
+function buildConsumerFallback({
+  userText,
+  playbooks,
+  emergencyFlags,
+  homeMatches,
+  products,
+  demandSignals,
+}: {
+  userText: string;
+  playbooks: CarePlaybook[];
+  emergencyFlags: string[];
+  homeMatches: Array<Record<string, unknown>>;
+  products: ReturnType<typeof productSuggestion>[];
+  demandSignals: DemandSignal[];
+}): string {
+  const lines: string[] = [];
+  const hasSymptoms = playbooks.length > 0;
+
+  if (emergencyFlags.length) {
+    lines.push(
+      `Похоже на красный флаг (${emergencyFlags.join(", ")}): лучше сразу вызвать 103/112 или обратиться за срочной помощью.`,
+    );
+  }
+
+  if (!hasSymptoms) {
+    lines.push(
+      "Я не вижу конкретного симптома или задачи. Напишите, что беспокоит, возраст, беременность/ГВ, хронические болезни, аллергии и что уже есть в аптечке.",
+    );
+    lines.push(
+      "Пока могу помочь проверить сроки, подобрать базовую аптечку, найти товар в каталоге или разобрать состав/инструкцию.",
+    );
+    return lines.join("\n");
+  }
+
+  const playbook = playbooks[0];
+  lines.push(`По запросу ближе всего: ${playbook.title}. Это не диагноз, а безопасная справочная рамка.`);
+  lines.push(`Что можно рассмотреть: ${playbook.safeOptions.join("; ")}. Дозировку и ограничения брать только из инструкции конкретного препарата.`);
+
+  if (homeMatches.length) {
+    const names = homeMatches
+      .slice(0, 4)
+      .map((m) => `${m.name ?? ""}${m.dosage ? ` ${m.dosage}` : ""}`.trim())
+      .filter(Boolean)
+      .join(", ");
+    lines.push(`В вашей аптечке похоже подходят: ${names}. Проверьте срок годности, действующее вещество и противопоказания.`);
+  } else {
+    lines.push("В вашей аптечке я не нашел явного совпадения по этому запросу.");
+  }
+
+  if (products.length) {
+    lines.push(
+      `В магазине можно посмотреть карточки: ${products
+        .slice(0, 3)
+        .map((p) => p.title)
+        .join(", ")}. Это варианты из каталога, не назначение лечения.`,
+    );
+  }
+
+  if (demandSignals.length) {
+    lines.push(
+      `По свежему спросу чаще встречаются: ${demandSignals
+        .slice(0, 3)
+        .map((s) => `${s.name} (${s.quantity} шт.)`)
+        .join(", ")}.`,
+    );
+  }
+
+  lines.push(`Сейчас: ${playbook.selfCare.join("; ")}.`);
+  lines.push(`К врачу/фармацевту: ${playbook.redFlags.join("; ")}.`);
+  return lines.join("\n");
 }
 
 async function fetchOpenFdaLabel(
@@ -354,14 +493,22 @@ async function fetchPubMed(topic: string): Promise<SourceReference | null> {
 
 function buildSystemPrompt({
   homeMedicines,
+  homeMatches,
   knowledge,
   sources,
   products,
+  playbooks,
+  emergencyFlags,
+  demandSignals,
 }: {
   homeMedicines: Array<Record<string, unknown>>;
+  homeMatches: Array<Record<string, unknown>>;
   knowledge: KnowledgeRow[];
   sources: SourceReference[];
   products: ReturnType<typeof productSuggestion>[];
+  playbooks: CarePlaybook[];
+  emergencyFlags: string[];
+  demandSignals: DemandSignal[];
 }): string {
   const medicineLines = homeMedicines.length
     ? homeMedicines
@@ -372,6 +519,8 @@ function buildSystemPrompt({
         )
         .join("\n")
     : "Аптечка пользователя пуста или не заполнена.";
+
+  const homeMatchLines = formatHomeMatches(homeMatches);
 
   const knowledgeLines = knowledge.length
     ? knowledge
@@ -400,27 +549,48 @@ function buildSystemPrompt({
         .join("\n")
     : "Подходящих товаров в каталоге не найдено.";
 
-  return `
-Ты — SmartKit AI, помощник по лекарствам, домашней аптечке, аптечному каталогу и безопасным следующим шагам.
+  const careLines = formatPlaybookContext(playbooks);
+  const demandLines = formatDemandSignals(demandSignals);
+  const emergencyLines = emergencyFlags.length
+    ? emergencyFlags.map((flag) => `• ${flag}`).join("\n")
+    : "Явных экстренных флагов в тексте не найдено.";
 
-Ты больше не ограничен только лекарствами из аптечки пользователя. Ты можешь:
+  return `
+Ты — аптечный помощник SmartKit по лекарствам, домашней аптечке, аптечному каталогу и безопасным следующим шагам.
+
+Ты не должен отвечать одним шаблонным "обратитесь к врачу", если можно дать полезную безопасную рамку. Ты больше не ограничен только лекарствами из аптечки пользователя. Ты можешь:
 1. Объяснять общие свойства и назначение безрецептурных категорий лекарств.
 2. Сравнивать товары из аптечки и каталога SmartKit.
 3. Предлагать конкретные карточки товаров из каталога, если они подходят под запрос.
-4. Использовать контекст прошлых сообщений, домашней аптечки, каталога и справочных источников.
+4. Называть конкретные безрецептурные действующие вещества/категории как варианты, если нет красных флагов и это не рецептурное лечение.
+5. Использовать контекст прошлых сообщений, домашней аптечки, каталога, свежего спроса и справочных источников.
 
 Жесткие правила безопасности:
 - Не ставь диагноз и не обещай лечение.
-- Не назначай персональные дозировки, курсы, антибиотики, гормоны, сердечные, диабетические и другие рецептурные препараты.
+- Не назначай персональные дозировки, курсы, антибиотики, гормоны, сердечные, диабетические и другие рецептурные препараты. Вместо дозировки говори: "по инструкции к конкретному препарату".
 - Для детей, беременности, ГВ, пожилых, хронических болезней, аллергий, полипрагмазии и сильных/долгих симптомов направляй к врачу или фармацевту.
 - При экстренных симптомах: немедленно скорая 103/112.
 - Если предлагаешь товар, объясни, что это категория/вариант из каталога, а не назначение лечения.
 - Всегда проси проверить инструкцию, противопоказания, действующее вещество и срок годности.
 - Не советуй принимать несколько средств с одинаковым действующим веществом.
 - Отвечай на языке пользователя.
+- Если симптом не указан, не угадывай лечение: попроси 1-3 уточнения и предложи, что можно проверить в аптечке/каталоге.
+- Если вопрос странный или бессмысленный, спокойно уточни, что именно нужно сделать, и не выдумывай диагноз.
 
 Текущая аптечка:
 ${medicineLines}
+
+Совпадения в аптечке под текущий запрос:
+${homeMatchLines}
+
+Сценарии безопасной помощи:
+${careLines}
+
+Красные флаги, найденные в тексте:
+${emergencyLines}
+
+Свежий B2C-спрос по близким товарам/категориям:
+${demandLines}
 
 Релевантная локальная база знаний:
 ${knowledgeLines}
@@ -432,10 +602,11 @@ ${sourceLines}
 ${productLines}
 
 Формат ответа:
-1. Короткий безопасный вывод.
-2. Что можно проверить/сделать сейчас.
-3. Если есть релевантные товары, упомяни их названия и скажи, что карточки ниже можно добавить в корзину.
-4. Когда обращаться к врачу.
+1. Короткий вывод по ситуации.
+2. Что уже есть в аптечке и что проверить.
+3. Какие безрецептурные варианты/категории можно рассмотреть, без персональной дозировки.
+4. Какие карточки магазина подходят, если они есть.
+5. Когда нужен врач/фармацевт или скорая.
 `.trim();
 }
 
@@ -543,7 +714,14 @@ Deno.serve(async (request) => {
       threadId = thread.id;
     }
 
-    const queryWords = medicalAliases(userText);
+    const carePlaybooks = detectCarePlaybooks(userText);
+    const emergencyFlags = detectEmergencyFlags(userText);
+    const queryWords = [
+      ...new Set([
+        ...medicalAliases(userText),
+        ...playbookTerms(carePlaybooks),
+      ]),
+    ].slice(0, 28);
     const fastAnswer = fastConsumerAnswer(userText);
     if (fastAnswer != null) {
       await Promise.all([
@@ -581,6 +759,7 @@ Deno.serve(async (request) => {
       { data: homeMedicines },
       { data: catalog },
       { data: knowledgeData },
+      { data: demandRows },
     ] = await Promise.all([
       supabase
         .from("chat_messages")
@@ -609,13 +788,40 @@ Deno.serve(async (request) => {
           "topic, generic_name, brand_names, summary, safety_notes, source_name, source_url, evidence_level, metadata",
         )
         .limit(60),
+      supabase
+        .from("shop_order_items")
+        .select("name, category, quantity, created_at")
+        .gte(
+          "created_at",
+          new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        )
+        .order("created_at", { ascending: false })
+        .limit(180),
     ]);
 
+    const homeMedicineRows = (homeMedicines ?? []) as Array<
+      Record<string, unknown>
+    >;
+    const homeMatches = matchingHomeMedicines(
+      homeMedicineRows,
+      queryWords,
+      carePlaybooks,
+    );
+    const demandSignals = aggregateDemandSignals(
+      (demandRows ?? []) as Array<Record<string, unknown>>,
+      carePlaybooks,
+      queryWords,
+      6,
+    );
+
     const scoredProducts = ((catalog ?? []) as CatalogRow[])
-      .map((product) => ({ product, score: scoreProduct(product, queryWords) }))
+      .map((product) => ({
+        product,
+        score: scoreProduct(product, queryWords, carePlaybooks),
+      }))
       .filter((entry) => entry.score > 0)
       .sort((a, b) => b.score - a.score)
-      .slice(0, 4)
+      .slice(0, 6)
       .map((entry) => productSuggestion(entry.product));
 
     const knowledge = ((knowledgeData ?? []) as KnowledgeRow[])
@@ -673,10 +879,14 @@ Deno.serve(async (request) => {
     ].slice(0, 5);
 
     const system = buildSystemPrompt({
-      homeMedicines: homeMedicines ?? [],
+      homeMedicines: homeMedicineRows,
+      homeMatches,
       knowledge,
       sources,
       products: scoredProducts,
+      playbooks: carePlaybooks,
+      emergencyFlags,
+      demandSignals,
     });
 
     const history = (previousMessages ?? [])
@@ -699,20 +909,38 @@ Deno.serve(async (request) => {
       metadata: { scope },
     });
 
-    const content = await sendOllamaChat({
-      messages: modelMessages,
-      temperature:
-        typeof body.temperature === "number" ? body.temperature : 0.25,
-      numPredict: userText.length < 180 ? 520 : 900,
-      numCtx: 3072,
-      timeoutMs: 12000,
-    });
+    let modelError: string | null = null;
+    let content = "";
+    try {
+      content = await sendOllamaChat({
+        messages: modelMessages,
+        temperature:
+          typeof body.temperature === "number" ? body.temperature : 0.22,
+        numPredict: userText.length < 180 ? 650 : 1000,
+        numCtx: 4096,
+        timeoutMs: 20000,
+      });
+    } catch (error) {
+      modelError = error instanceof Error ? error.message : "Ollama unavailable";
+      content = buildConsumerFallback({
+        userText,
+        playbooks: carePlaybooks,
+        emergencyFlags,
+        homeMatches,
+        products: scoredProducts,
+        demandSignals,
+      });
+    }
 
     await supabase.from("chat_messages").insert({
       thread_id: threadId,
       role: "assistant",
       content,
-      metadata: { sources, productSuggestions: scoredProducts },
+      metadata: {
+        sources,
+        productSuggestions: scoredProducts,
+        fallback: modelError !== null,
+      },
     });
 
     await supabase
@@ -729,12 +957,13 @@ Deno.serve(async (request) => {
       scope,
       prompt: userText,
       response: content,
-      status: "ok",
+      status: modelError === null ? "ok" : "fallback",
       model: Deno.env.get("OLLAMA_MODEL") ?? "qwen3:latest",
       latency_ms: Date.now() - started,
       sources,
       product_suggestions: scoredProducts,
-      safety_flags: [],
+      safety_flags: emergencyFlags,
+      error_message: modelError,
     };
 
     await supabase.from("ai_request_logs").insert(logPayload);

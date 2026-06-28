@@ -5,8 +5,8 @@ const host = process.env.HOST ?? '127.0.0.1';
 const ollamaBaseUrl = process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11435';
 const proxyToken = process.env.OLLAMA_PROXY_TOKEN ?? '';
 const ollamaKeepAlive = process.env.OLLAMA_KEEP_ALIVE ?? '24h';
-const maxNumCtx = envInt('OLLAMA_PROXY_NUM_CTX_MAX', 1024);
-const maxNumPredict = envInt('OLLAMA_PROXY_NUM_PREDICT_MAX', 80);
+const maxNumCtx = envInt('OLLAMA_PROXY_NUM_CTX_MAX', 4096);
+const maxNumPredict = envInt('OLLAMA_PROXY_NUM_PREDICT_MAX', 1200);
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
@@ -44,7 +44,9 @@ function normalizeOllamaBody(request, body) {
       : {};
 
     payload.stream = false;
-    payload.think = false;
+    if (typeof payload.think !== 'boolean') {
+      delete payload.think;
+    }
     payload.keep_alive = payload.keep_alive ?? ollamaKeepAlive;
     options.num_ctx = clampInt(options.num_ctx, maxNumCtx, maxNumCtx);
     options.num_predict = clampInt(

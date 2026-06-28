@@ -42,10 +42,10 @@ $accessToken = Require-EnvValue $envValues "SUPABASE_ACCESS_TOKEN"
 $proxyToken = Require-EnvValue $envValues "OLLAMA_PROXY_TOKEN"
 $model = EnvValueOrDefault $envValues "OLLAMA_MODEL" "qwen3:latest"
 $keepAlive = EnvValueOrDefault $envValues "OLLAMA_KEEP_ALIVE" "24h"
-$numCtxMax = EnvValueOrDefault $envValues "OLLAMA_NUM_CTX_MAX" "1024"
-$numPredictMax = EnvValueOrDefault $envValues "OLLAMA_NUM_PREDICT_MAX" "80"
-$systemMax = EnvValueOrDefault $envValues "OLLAMA_SYSTEM_MAX" "1000"
-$messageMax = EnvValueOrDefault $envValues "OLLAMA_MESSAGE_MAX" "360"
+$numCtxMax = EnvValueOrDefault $envValues "OLLAMA_NUM_CTX_MAX" "4096"
+$numPredictMax = EnvValueOrDefault $envValues "OLLAMA_NUM_PREDICT_MAX" "1200"
+$systemMax = EnvValueOrDefault $envValues "OLLAMA_SYSTEM_MAX" "5500"
+$messageMax = EnvValueOrDefault $envValues "OLLAMA_MESSAGE_MAX" "900"
 
 docker compose -p $ComposeProject -f $ComposeFile up -d --build
 if ($LASTEXITCODE -ne 0) {
@@ -72,6 +72,11 @@ do {
 
 if ((Get-Date) -ge $warmupDeadline) {
   throw "ollama warmup did not finish"
+}
+
+docker compose -p $ComposeProject -f $ComposeFile up -d --force-recreate ollama-proxy cloudflared
+if ($LASTEXITCODE -ne 0) {
+  throw "proxy/tunnel recreate failed"
 }
 
 $healthDeadline = (Get-Date).AddMinutes(2)

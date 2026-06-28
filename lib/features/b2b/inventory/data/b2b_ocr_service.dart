@@ -1,12 +1,15 @@
 import 'dart:async';
 
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/api/smartkit_api_client.dart';
 import '../../../../core/services/barcode_service.dart';
 import '../models/b2b_ocr_result.dart';
 
 class B2BOcrService {
   static const Duration _lookupTimeout = Duration(milliseconds: 1400);
+  static const Duration _serverParserTimeout = Duration(milliseconds: 3600);
 
   Future<B2BOcrResult> scanPackageImage(String imagePath) async {
     final inputImage = InputImage.fromFilePath(imagePath);
@@ -15,10 +18,76 @@ class B2BOcrService {
     try {
       final recognizedText = await recognizer.processImage(inputImage);
       final parsed = parsePackageText(recognizedText.text);
-      return enrichWithBarcodeLookup(parsed);
+      final enriched = await enrichWithBarcodeLookup(parsed);
+      return _enrichWithServerParser(recognizedText.text, enriched);
     } finally {
       await recognizer.close();
     }
+  }
+
+  Future<B2BOcrResult> _enrichWithServerParser(
+    String rawText,
+    B2BOcrResult localResult,
+  ) async {
+    final accessToken =
+        Supabase.instance.client.auth.currentSession?.accessToken;
+    if (accessToken == null || rawText.trim().length < 3) return localResult;
+
+    try {
+      final response = await SmartKitApiClient().postJson(
+        'medicine-ocr',
+        accessToken: accessToken,
+        body: {
+          'rawText': rawText,
+          'barcode': localResult.barcode,
+          'localDraft': localResult.toMap(),
+        },
+      ).timeout(_serverParserTimeout);
+
+      final rawResult = response['result'];
+      if (rawResult is! Map) return localResult;
+      final serverResult = B2BOcrResult.fromMap(
+        Map<String, dynamic>.from(rawResult),
+      );
+      return _mergeServerResult(localResult, serverResult);
+    } catch (_) {
+      return localResult;
+    }
+  }
+
+  B2BOcrResult _mergeServerResult(
+    B2BOcrResult local,
+    B2BOcrResult server,
+  ) {
+    final confidence =
+        server.confidence > local.confidence
+            ? server.confidence
+            : local.confidence;
+    return local.copyWith(
+      rawText: _firstNonEmpty([local.rawText, server.rawText]) ?? local.rawText,
+      name: _firstNonEmpty([server.name, local.name]),
+      category: _firstNonEmpty([server.category, local.category]),
+      manufacturer: _firstNonEmpty([server.manufacturer, local.manufacturer]),
+      description: _firstNonEmpty([server.description, local.description]),
+      dosage: _firstNonEmpty([server.dosage, local.dosage]),
+      packageSize: _firstNonEmpty([server.packageSize, local.packageSize]),
+      barcode: _firstNonEmpty([server.barcode, local.barcode]),
+      batchNumber: _firstNonEmpty([server.batchNumber, local.batchNumber]),
+      form: _firstNonEmpty([server.form, local.form]),
+      unitLabel: _firstNonEmpty([server.unitLabel, local.unitLabel]),
+      storagePlace: _firstNonEmpty([server.storagePlace, local.storagePlace]),
+      expiryDate: server.expiryDate ?? local.expiryDate,
+      source: _combineSources(local.source, server.source),
+      lookupMessage:
+          _firstNonEmpty([server.lookupMessage, local.lookupMessage]) ??
+          _lookupMessage(confidence),
+      confidence: confidence,
+      needsReview: confidence < 0.78 || (server.name ?? local.name) == null,
+      suggestedStock: server.suggestedStock ?? local.suggestedStock ?? 1,
+      suggestedMinStock:
+          server.suggestedMinStock ?? local.suggestedMinStock,
+      suggestedPrice: server.suggestedPrice ?? local.suggestedPrice,
+    );
   }
 
   Future<B2BOcrResult> enrichWithBarcodeLookup(B2BOcrResult result) async {
@@ -71,6 +140,7 @@ class B2BOcrService {
     final barcode = _extractBarcode(joined);
     final batchNumber = _extractBatch(joined);
     final expiryDate = _extractExpiryDate(joined);
+    final suggestedPrice = _extractPrice(joined);
     final description = _buildDescription(
       name: name,
       category: category,
@@ -114,6 +184,7 @@ class B2BOcrService {
       needsReview: confidence < 0.75 || name == null,
       suggestedStock: name == null ? null : 1,
       suggestedMinStock: _suggestMinStock(category),
+      suggestedPrice: suggestedPrice,
     );
   }
 
@@ -195,6 +266,10 @@ class B2BOcrService {
       suggestedStock: ocr.suggestedStock ?? 1,
       suggestedMinStock:
           ocr.suggestedMinStock ?? _suggestMinStock(mergedCategory),
+      suggestedPrice:
+          ocr.suggestedPrice ??
+          _intFrom(lookup['suggestedPrice']) ??
+          _intFrom(lookup['price']),
     );
   }
 
@@ -227,7 +302,6 @@ class B2BOcrService {
         RegExp(r'\bCEPИЯ\b', caseSensitive: false): 'СЕРИЯ',
         RegExp(r'\bCEР[,.]?\b', caseSensitive: false): 'СЕРИЯ',
         RegExp(r'\bPECKITT\b', caseSensitive: false): 'RECKITT',
-        RegExp(r'(?<=\d)\s*(?:mr|mг|мr|мт|mt)\b', caseSensitive: false): ' мг',
       };
 
       for (final entry in replacements.entries) {
@@ -236,6 +310,10 @@ class B2BOcrService {
       value = value.replaceAllMapped(
         RegExp(r'\b(?:N|No|NO)\s?(\d{1,4})\b', caseSensitive: false),
         (match) => '№${match.group(1)}',
+      );
+      value = value.replaceAllMapped(
+        RegExp(r'(\d)\s*(?:mr|mг|мr|мт|mt)\b', caseSensitive: false),
+        (match) => '${match.group(1)} мг',
       );
       return value;
     });
@@ -564,6 +642,24 @@ class B2BOcrService {
     return null;
   }
 
+  int? _extractPrice(String text) {
+    final patterns = [
+      RegExp(
+        r'(?:цена|price|бағасы)\s*[:\-]?\s*(\d{2,7})\s*(?:₸|тг|тенге|kzt)?',
+        caseSensitive: false,
+      ),
+      RegExp(r'\b(\d{2,7})\s*(?:₸|тг|тенге|kzt)\b', caseSensitive: false),
+    ];
+
+    for (final pattern in patterns) {
+      final match = pattern.firstMatch(text);
+      if (match == null) continue;
+      final value = int.tryParse(match.group(1) ?? '');
+      if (value != null && value >= 10) return value;
+    }
+    return null;
+  }
+
   DateTime? _extractExpiryDate(String text) {
     final datePattern = RegExp(
       r'(?:exp\.?|expiry|expires|годен до|срок годности|срок до|исп\.? до|до)?\s*(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})',
@@ -836,6 +932,12 @@ class B2BOcrService {
     return null;
   }
 
+  int? _intFrom(dynamic value) {
+    if (value is num) return value.toInt();
+    if (value == null) return null;
+    return int.tryParse(value.toString().replaceAll(RegExp(r'[^\d]'), ''));
+  }
+
   String _combineSources(dynamic first, dynamic second) {
     final values =
         [first, second]
@@ -1004,6 +1106,62 @@ class B2BOcrService {
       category: 'ЖКТ',
       manufacturer: 'Sanofi',
       minStock: 5,
+    ),
+    _MedicineHint(
+      aliases: ['кеторол', 'ketorol', 'ketorolac', 'кеторолак'],
+      name: 'Кеторол',
+      latinName: 'Ketorol',
+      category: 'Обезболивающее',
+      minStock: 5,
+    ),
+    _MedicineHint(
+      aliases: ['диклофенак', 'diclofenac', 'вольтарен', 'voltaren'],
+      name: 'Диклофенак',
+      latinName: 'Diclofenac',
+      category: 'Противовоспалительное',
+      minStock: 5,
+    ),
+    _MedicineHint(
+      aliases: ['энтеросгель', 'enterosgel'],
+      name: 'Энтеросгель',
+      latinName: 'Enterosgel',
+      category: 'ЖКТ',
+      minStock: 5,
+    ),
+    _MedicineHint(
+      aliases: ['лоперамид', 'loperamide', 'имодиум', 'imodium'],
+      name: 'Лоперамид',
+      latinName: 'Loperamide',
+      category: 'ЖКТ',
+      minStock: 4,
+    ),
+    _MedicineHint(
+      aliases: ['активированный уголь', 'уголь активированный', 'activated charcoal'],
+      name: 'Активированный уголь',
+      latinName: 'Activated charcoal',
+      category: 'Сорбенты',
+      minStock: 5,
+    ),
+    _MedicineHint(
+      aliases: ['фервекс', 'fervex'],
+      name: 'Фервекс',
+      latinName: 'Fervex',
+      category: 'От простуды',
+      minStock: 8,
+    ),
+    _MedicineHint(
+      aliases: ['називин', 'nasivin', 'оксиметазолин', 'oxymetazoline'],
+      name: 'Називин',
+      latinName: 'Nasivin',
+      category: 'От простуды',
+      minStock: 6,
+    ),
+    _MedicineHint(
+      aliases: ['анаферон', 'anaferon'],
+      name: 'Анаферон',
+      latinName: 'Anaferon',
+      category: 'Противовирусное',
+      minStock: 4,
     ),
   ];
 }
