@@ -227,7 +227,7 @@ async function fetchOpenFdaLabel(
   try {
     const response = await fetch(url, {
       headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(2500),
     });
     if (!response.ok) return null;
     const data = await response.json();
@@ -257,7 +257,7 @@ async function fetchRxNorm(term: string): Promise<SourceReference | null> {
   try {
     const response = await fetch(url, {
       headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(2500),
     });
     if (!response.ok) return null;
     const data = await response.json();
@@ -293,7 +293,7 @@ async function fetchDailyMed(term: string): Promise<SourceReference | null> {
   try {
     const response = await fetch(url, {
       headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(2500),
     });
     if (!response.ok) return null;
     const data = await response.json();
@@ -321,7 +321,7 @@ async function fetchPubMed(topic: string): Promise<SourceReference | null> {
   try {
     const search = await fetch(searchUrl, {
       headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(2500),
     });
     if (!search.ok) return null;
     const searchData = await search.json();
@@ -334,7 +334,7 @@ async function fetchPubMed(topic: string): Promise<SourceReference | null> {
     )}`;
     const summary = await fetch(summaryUrl, {
       headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(2500),
     });
     if (!summary.ok) {
       return { name: "PubMed", url: searchUrl, type: "scientific_literature" };
@@ -439,6 +439,54 @@ ${productLines}
 `.trim();
 }
 
+function detectFastLanguage(userText: string): "ru" | "en" | "kk" {
+  const lower = userText.toLowerCase();
+  if (/[әғқңөұүһі]/i.test(lower) || /(сәлем|көмек|дәрі|қалай)/i.test(lower)) {
+    return "kk";
+  }
+  if (/[a-z]/i.test(lower) && !/[а-яё]/i.test(lower)) return "en";
+  return "ru";
+}
+
+function fastConsumerAnswer(userText: string): string | null {
+  const lower = userText.toLowerCase().trim();
+  const language = detectFastLanguage(userText);
+  if (lower.length <= 40 && /^(привет|здравствуй|салам|сәлем|hello|hi|hey)/i.test(lower)) {
+    if (language === "en") {
+      return "Hi! I am SmartKit AI. I can check your first-aid kit, expiry dates, stock, explain general OTC medicine categories, and suggest safe next steps.";
+    }
+    if (language === "kk") {
+      return "Сәлем! Мен SmartKit AI. Дәрі қобдишасын, жарамдылық мерзімдерін, қалдықтарды тексеріп, рецептісіз дәрі санаттарын түсіндіріп, қауіпсіз келесі қадамдарды ұсына аламын.";
+    }
+    return "Привет! Я SmartKit AI. Могу проверить аптечку, сроки годности, остатки, объяснить общие категории безрецептурных средств и подсказать безопасные следующие шаги.";
+  }
+  if (
+    lower.length <= 140 &&
+    /(что ты умеешь|чем поможешь|как пользоваться|помощь|help|what can you do|how to use|не істей аласың|көмек)/i
+      .test(lower)
+  ) {
+    if (language === "en") {
+      return "I can quickly check your first-aid kit and expiry dates, find low stock, help build a basic cart, explain general OTC categories, and flag when a doctor or pharmacist is needed.";
+    }
+    if (language === "kk") {
+      return "Мен дәрі қобдишасын және жарамдылық мерзімдерін тез тексеремін, аз қалғандарын табамын, негізгі себет жинауға көмектесемін, рецептісіз дәрі санаттарын түсіндіремін және дәрігер/фармацевт керек кезде ескертемін.";
+    }
+    return "Я умею быстро проверять аптечку и сроки, находить низкие остатки, помогать с базовой корзиной, объяснять общие свойства безрецептурных категорий и подсказывать, когда лучше обратиться к врачу или фармацевту.";
+  }
+  return null;
+}
+
+function shouldFetchExternalSources(
+  userText: string,
+  knowledge: KnowledgeRow[],
+  queryWords: string[],
+): boolean {
+  const lower = userText.toLowerCase();
+  if (knowledge.length === 0 && queryWords.length === 0) return false;
+  return /(инструкц|противопоказ|побоч|действующ|веществ|совмест|взаимодейств|исслед|источник|label|contraindication|side effect|interaction|source)/i
+    .test(lower);
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return preflightResponse();
   if (request.method !== "POST") {
@@ -495,44 +543,80 @@ Deno.serve(async (request) => {
       threadId = thread.id;
     }
 
-    const { data: previousMessages } = await supabase
-      .from("chat_messages")
-      .select("role, content")
-      .eq("thread_id", threadId)
-      .order("created_at", { ascending: false })
-      .limit(12);
-
-    const { data: homeMedicines } = await supabase
-      .from("medicines")
-      .select("name, dosage, quantity, category, expiry_date, notes")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(80);
-
-    const { data: catalog } = await supabase
-      .from("b2b_inventory")
-      .select(
-        "id, organization_id, name, category, description, manufacturer, dosage, package_size, barcode, batch_number, stock, min_stock, price, location_id, expiry_date, created_at, updated_at",
-      )
-      .eq("is_public", true)
-      .gt("stock", 0)
-      .order("name", { ascending: true })
-      .limit(200);
-
     const queryWords = medicalAliases(userText);
+    const fastAnswer = fastConsumerAnswer(userText);
+    if (fastAnswer != null) {
+      await Promise.all([
+        supabase.from("chat_messages").insert({
+          thread_id: threadId,
+          role: "user",
+          content: userText,
+          metadata: { scope, fast: true },
+        }),
+        supabase.from("chat_messages").insert({
+          thread_id: threadId,
+          role: "assistant",
+          content: fastAnswer,
+          metadata: { sources: [], productSuggestions: [], fast: true },
+        }),
+        supabase
+          .from("chat_threads")
+          .update({
+            last_message_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", threadId),
+      ]);
+
+      return jsonResponse({
+        message: fastAnswer,
+        threadId,
+        productSuggestions: [],
+        sources: [],
+      });
+    }
+
+    const [
+      { data: previousMessages },
+      { data: homeMedicines },
+      { data: catalog },
+      { data: knowledgeData },
+    ] = await Promise.all([
+      supabase
+        .from("chat_messages")
+        .select("role, content")
+        .eq("thread_id", threadId)
+        .order("created_at", { ascending: false })
+        .limit(8),
+      supabase
+        .from("medicines")
+        .select("name, dosage, quantity, category, expiry_date, notes")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(50),
+      supabase
+        .from("b2b_inventory")
+        .select(
+          "id, organization_id, name, category, description, manufacturer, dosage, package_size, barcode, batch_number, stock, min_stock, price, location_id, expiry_date, created_at, updated_at",
+        )
+        .eq("is_public", true)
+        .gt("stock", 0)
+        .order("name", { ascending: true })
+        .limit(80),
+      supabase
+        .from("ai_medical_knowledge")
+        .select(
+          "topic, generic_name, brand_names, summary, safety_notes, source_name, source_url, evidence_level, metadata",
+        )
+        .limit(60),
+    ]);
+
     const scoredProducts = ((catalog ?? []) as CatalogRow[])
       .map((product) => ({ product, score: scoreProduct(product, queryWords) }))
       .filter((entry) => entry.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, 4)
       .map((entry) => productSuggestion(entry.product));
-
-    const { data: knowledgeData } = await supabase
-      .from("ai_medical_knowledge")
-      .select(
-        "topic, generic_name, brand_names, summary, safety_notes, source_name, source_url, evidence_level, metadata",
-      )
-      .limit(100);
 
     const knowledge = ((knowledgeData ?? []) as KnowledgeRow[])
       .filter((item) => {
@@ -549,25 +633,32 @@ Deno.serve(async (request) => {
       })
       .slice(0, 5);
 
-    const termsForExternal = [
-      ...new Set([
-        ...(knowledge
-          .map((item) => item.generic_name)
-          .filter(Boolean) as string[]),
-        ...medicalAliases(userText).filter((term) =>
-          /^[a-z][a-z\s-]+$/i.test(term),
-        ),
-      ]),
-    ].slice(0, 2);
+    const shouldFetchSources = shouldFetchExternalSources(
+      userText,
+      knowledge,
+      queryWords,
+    );
+    const termsForExternal = shouldFetchSources
+      ? [
+        ...new Set([
+          ...(knowledge
+            .map((item) => item.generic_name)
+            .filter(Boolean) as string[]),
+          ...queryWords.filter((term) => /^[a-z][a-z\s-]+$/i.test(term)),
+        ]),
+      ].slice(0, 1)
+      : [];
 
-    const externalResults = await Promise.all([
-      ...termsForExternal.flatMap((term) => [
-        fetchRxNorm(term),
-        fetchDailyMed(term),
-        fetchOpenFdaLabel(term),
-      ]),
-      fetchPubMed(userText),
-    ]);
+    const externalResults = shouldFetchSources
+      ? await Promise.all([
+        ...termsForExternal.flatMap((term) => [
+          fetchRxNorm(term),
+          fetchDailyMed(term),
+          fetchOpenFdaLabel(term),
+        ]),
+        fetchPubMed(userText),
+      ])
+      : [];
 
     const sources = [
       ...knowledge.map((item) => ({
@@ -579,7 +670,7 @@ Deno.serve(async (request) => {
       ...externalResults.filter(
         (item): item is SourceReference => item !== null,
       ),
-    ].slice(0, 8);
+    ].slice(0, 5);
 
     const system = buildSystemPrompt({
       homeMedicines: homeMedicines ?? [],
@@ -612,6 +703,9 @@ Deno.serve(async (request) => {
       messages: modelMessages,
       temperature:
         typeof body.temperature === "number" ? body.temperature : 0.25,
+      numPredict: userText.length < 180 ? 520 : 900,
+      numCtx: 3072,
+      timeoutMs: 12000,
     });
 
     await supabase.from("chat_messages").insert({

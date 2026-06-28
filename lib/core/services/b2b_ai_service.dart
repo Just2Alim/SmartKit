@@ -6,6 +6,7 @@ import '../../features/b2b/inventory/models/b2b_inventory_model.dart';
 import '../../features/b2b/inventory/models/b2b_sale_model.dart';
 import '../../features/b2b/inventory/models/b2b_location_model.dart';
 import '../api/smartkit_api_client.dart';
+import 'ai_runtime_config.dart';
 import 'ai_safety.dart';
 
 /// Специализированный сервис ИИ для B2B сектора SmartKit.
@@ -16,6 +17,7 @@ class B2BAiService {
   B2BAiService._();
 
   String? _systemContext;
+  String? _lastWorkingEndpoint;
   final List<Map<String, String>> _history = [];
   List<B2BInventoryModel> _inventory = [];
   List<B2BSaleModel> _sales = [];
@@ -54,7 +56,7 @@ class B2BAiService {
     buffer.writeln(AiSafety.businessSystemPrompt());
 
     buffer.writeln('\n--- ЛОКАЦИИ И СКЛАДЫ ---');
-    for (var loc in locations) {
+    for (var loc in locations.take(30)) {
       buffer.writeln(
         '• ${loc.name} (${loc.type}): текущая загрузка ${loc.currentItems}/${loc.capacity}, статус: ${loc.status}',
       );
@@ -62,25 +64,12 @@ class B2BAiService {
 
     buffer.writeln('\n--- ТЕКУЩИЕ ДАННЫЕ СКЛАДА ---');
     final now = DateTime.now();
+    final locationNames = {
+      for (final location in locations) location.id: location.name,
+    };
 
-    for (var item in inventory.take(160)) {
-      final locName =
-          locations
-              .firstWhere(
-                (l) => l.id == item.locationId,
-                orElse:
-                    () => B2BLocationModel(
-                      id: '',
-                      userId: '',
-                      name: 'Не указана',
-                      type: '',
-                      address: '',
-                      currentItems: 0,
-                      capacity: 0,
-                      status: '',
-                    ),
-              )
-              .name;
+    for (var item in inventory.take(70)) {
+      final locName = locationNames[item.locationId] ?? 'Не указана';
       buffer.write(
         '• ${item.name}: категория ${item.category}, остаток ${item.stock}, порог ${item.minStock}, цена ${item.price}, локация $locName',
       );
@@ -93,7 +82,7 @@ class B2BAiService {
     }
 
     buffer.writeln('\n--- ИСТОРИЯ ПРОДАЖ (ПОСЛЕДНИЕ ТРАНЗАКЦИИ) ---');
-    final recentSales = sales.take(30).toList();
+    final recentSales = sales.take(16).toList();
     for (var sale in recentSales) {
       buffer.writeln(
         '• Дата: ${sale.saleDate.toIso8601String()}, сумма: ${sale.totalAmount}, строк: ${sale.items.length}',
@@ -106,9 +95,7 @@ class B2BAiService {
 
   /// Получить краткую сводку по состоянию бизнеса
   Future<String> getQuickBusinessAnalysis() async {
-    return sendMessage(
-      'Проведи краткий анализ моего склада и последних продаж. Выдели 3 самых важных момента, на которые мне стоит обратить внимание.',
-    );
+    return _quickBusinessAnalysis(AiResponseLanguage.russian);
   }
 
   Future<String> sendMessage(String text) async {
@@ -121,41 +108,57 @@ class B2BAiService {
       init(_inventory, _sales, _locations);
     }
 
-    try {
-      final promptText = AiSafety.wrapUserMessageWithLanguageInstruction(text);
-      _history.add({'role': 'user', 'content': promptText});
+    final promptText = AiSafety.wrapUserMessageWithLanguageInstruction(text);
+    final localResponse = _preflightBusinessResponse(text);
+    if (localResponse != null) {
+      AiRuntimeConfig.remember(_history, 'user', promptText);
+      AiRuntimeConfig.remember(_history, 'assistant', localResponse);
+      return localResponse;
+    }
 
-      final backendResponse = await _sendViaBackend(text);
+    try {
+      AiRuntimeConfig.remember(_history, 'user', promptText);
+
+      final backendResponse = await _sendViaBackend(
+        text,
+      ).timeout(AiRuntimeConfig.backendTimeout, onTimeout: () => null);
       if (backendResponse != null && backendResponse.trim().isNotEmpty) {
         var responseText = backendResponse.trim();
         if (AiSafety.appearsToUseDifferentLanguage(responseText, text)) {
           responseText = _languageSafeBusinessFallback(text);
         }
-        _history.add({'role': 'assistant', 'content': responseText});
+        AiRuntimeConfig.remember(_history, 'assistant', responseText);
         return responseText;
       }
 
       for (final endpoint in _candidateBaseUrls) {
         try {
-          final response = await http.post(
-            Uri.parse(endpoint),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'model': _model,
-              'messages': _history,
-              'stream': false,
-              'options': {
-                'temperature': 0.25,
-                'top_p': 0.85,
-                'num_ctx': 8192,
-                'num_predict': 4096,
-              },
-            }),
-          );
+          final response = await http
+              .post(
+                Uri.parse(endpoint),
+                headers: {'Content-Type': 'application/json'},
+                body: jsonEncode({
+                  'model': _model,
+                  'messages': AiRuntimeConfig.compactMessages(
+                    _history,
+                    systemLimit: 2400,
+                    recentMessages: 5,
+                  ),
+                  'stream': false,
+                  'options': AiRuntimeConfig.ollamaOptions(
+                    userText: text,
+                    temperature: 0.22,
+                    business: true,
+                  ),
+                }),
+              )
+              .timeout(AiRuntimeConfig.localTimeout);
 
           if (response.statusCode == 200) {
             final data = jsonDecode(utf8.decode(response.bodyBytes));
-            var responseText = data['message']['content'] as String;
+            var responseText = AiRuntimeConfig.sanitizeAssistantContent(
+              data['message']['content'] as String? ?? '',
+            );
 
             if (AiSafety.appearsToUseDifferentLanguage(responseText, text)) {
               final repairedResponse = await _repairLanguage(
@@ -175,7 +178,8 @@ class B2BAiService {
               }
             }
 
-            _history.add({'role': 'assistant', 'content': responseText});
+            _lastWorkingEndpoint = endpoint;
+            AiRuntimeConfig.remember(_history, 'assistant', responseText);
             return responseText;
           }
         } catch (_) {
@@ -195,37 +199,40 @@ class B2BAiService {
     required String userText,
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse(endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'model': _model,
-          'messages': [
-            {
-              'role': 'system',
-              'content': AiSafety.languageRepairSystemPrompt(userText),
-            },
-            {
-              'role': 'user',
-              'content': AiSafety.languageRepairPrompt(
+      final response = await http
+          .post(
+            Uri.parse(endpoint),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'model': _model,
+              'messages': [
+                {
+                  'role': 'system',
+                  'content': AiSafety.languageRepairSystemPrompt(userText),
+                },
+                {
+                  'role': 'user',
+                  'content': AiSafety.languageRepairPrompt(
+                    userText: userText,
+                    assistantAnswer: responseText,
+                  ),
+                },
+              ],
+              'stream': false,
+              'options': AiRuntimeConfig.ollamaOptions(
                 userText: userText,
-                assistantAnswer: responseText,
+                repair: true,
+                business: true,
               ),
-            },
-          ],
-          'stream': false,
-          'options': {
-            'temperature': 0.1,
-            'top_p': 0.8,
-            'num_ctx': 8192,
-            'num_predict': 2048,
-          },
-        }),
-      );
+            }),
+          )
+          .timeout(AiRuntimeConfig.repairTimeout);
 
       if (response.statusCode != 200) return null;
       final data = jsonDecode(utf8.decode(response.bodyBytes));
-      return data['message']['content'] as String?;
+      return AiRuntimeConfig.sanitizeAssistantContent(
+        data['message']['content'] as String? ?? '',
+      );
     } catch (_) {
       return null;
     }
@@ -269,12 +276,50 @@ class B2BAiService {
         _looksLikeTopAlert(text.toLowerCase())
             ? _topBusinessAlert(language)
             : _quickBusinessAnalysis(language);
-    _history.add({'role': 'assistant', 'content': response});
+    AiRuntimeConfig.remember(_history, 'assistant', response);
     return response;
   }
 
   String _languageSafeBusinessFallback(String text) {
     return _quickBusinessAnalysis(AiSafety.detectLanguage(text));
+  }
+
+  String? _preflightBusinessResponse(String text) {
+    final lower = text.toLowerCase();
+    final language = AiSafety.detectLanguage(text);
+    if (_looksLikeTopAlert(lower)) return _topBusinessAlert(language);
+    if (!_looksLikeFastBusinessQuestion(lower)) return null;
+    return _quickBusinessAnalysis(language);
+  }
+
+  bool _looksLikeFastBusinessQuestion(String lower) {
+    if (lower.length > 220) return false;
+    return [
+      'крат',
+      'анализ',
+      'сводк',
+      'склад',
+      'остат',
+      'продаж',
+      'выруч',
+      'просроч',
+      'срок',
+      'риск',
+      'локац',
+      'что делать',
+      'business',
+      'summary',
+      'stock',
+      'sales',
+      'revenue',
+      'expired',
+      'risk',
+      'warehouse',
+      'қысқаша',
+      'қалдық',
+      'сатылым',
+      'мерзім',
+    ].any(lower.contains);
   }
 
   bool _looksLikeTopAlert(String lower) {
@@ -291,18 +336,23 @@ class B2BAiService {
   }
 
   List<String> get _candidateBaseUrls {
+    final preferred =
+        _lastWorkingEndpoint == null
+            ? const <String>[]
+            : [_lastWorkingEndpoint!];
     if (kIsWeb) {
-      return const ['http://localhost:11434/api/chat'];
+      return {...preferred, 'http://localhost:11434/api/chat'}.toList();
     }
 
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return const [
+      return {
+        ...preferred,
         'http://10.0.2.2:11434/api/chat',
         'http://localhost:11434/api/chat',
-      ];
+      }.toList();
     }
 
-    return _baseUrls.take(2).toList();
+    return {...preferred, ..._baseUrls.take(2)}.toList();
   }
 
   String _topBusinessAlert(AiResponseLanguage language) {

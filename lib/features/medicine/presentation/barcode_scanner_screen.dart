@@ -68,7 +68,10 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
     _showLoadingDialog();
 
     try {
-      final medicineInfo = await BarcodeService.lookupBarcode(barcode);
+      final medicineInfo = await BarcodeService.lookupBarcode(
+        barcode,
+        allowSlowNetwork: false,
+      );
 
       if (!mounted) return;
       Navigator.of(context).pop(); // Close loading dialog

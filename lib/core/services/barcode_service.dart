@@ -7,6 +7,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/medicine/domain/gs1_barcode_parser.dart';
 
 class BarcodeService {
+  static final Map<String, Map<String, dynamic>> _lookupCache = {};
+  static const Duration _privateLookupTimeout = Duration(milliseconds: 900);
+  static const Duration _publicLookupTimeout = Duration(milliseconds: 1800);
+  static const Duration _referenceEnrichmentTimeout = Duration(
+    milliseconds: 1200,
+  );
+  static const Duration _externalHttpTimeout = Duration(seconds: 3);
+
   static const String _openFoodFactsApiUrl =
       'https://world.openfoodfacts.org/api/v2/product/';
   static const String _openProductsFactsApiUrl =
@@ -21,7 +29,10 @@ class BarcodeService {
 
   /// Возвращает черновик лекарства всегда, даже если внешний справочник ничего
   /// не знает о коде. Так UI не упирается в ошибку "не найдено".
-  static Future<Map<String, dynamic>?> lookupBarcode(String barcode) async {
+  static Future<Map<String, dynamic>?> lookupBarcode(
+    String barcode, {
+    bool allowSlowNetwork = true,
+  }) async {
     final gs1Data = Gs1BarcodeParser.parse(barcode);
     final lookupValue =
         gs1Data?['gtin']?.toString() ??
@@ -30,37 +41,84 @@ class BarcodeService {
     final normalizedBarcode = _normalizeBarcode(lookupValue);
     if (!_looksLikeBarcode(normalizedBarcode)) return null;
 
+    final cached = _lookupCache[normalizedBarcode];
+    if (cached != null) return Map<String, dynamic>.from(cached);
+
     try {
       debugPrint('Looking up barcode: $normalizedBarcode');
 
-      final sources = <Future<Map<String, dynamic>?> Function()>[
-        () => _lookupLearnedBarcode(normalizedBarcode),
-        () => _lookupB2BInventory(normalizedBarcode),
-        () => _lookupOpenProductsFacts(normalizedBarcode),
-        () => _lookupOpenFoodFacts(normalizedBarcode),
-        () => _lookupOpenFDA(normalizedBarcode),
-      ];
-
-      for (final source in sources) {
-        final result = await source();
-        if (result == null) continue;
-        final enriched = await _enrichDrugReference(result);
-        final merged = _mergeScanData(enriched, gs1Data);
-        return _withDefaults(
+      final localResult = _lookupLocalDatabase(normalizedBarcode);
+      if (localResult != null) {
+        final merged = _mergeScanData(localResult, gs1Data);
+        return _rememberLookup(
           normalizedBarcode,
-          merged,
-          needsPackageScan: _needsPackageScan(merged),
+          _withDefaults(
+            normalizedBarcode,
+            merged,
+            needsPackageScan: _needsPackageScan(merged),
+          ),
         );
       }
 
-      final localResult = _lookupLocalDatabase(normalizedBarcode);
-      if (localResult != null) {
-        final enriched = await _enrichDrugReference(localResult);
+      final privateResult = await _bestLookup([
+        _lookupLearnedBarcode(normalizedBarcode),
+        _lookupB2BInventory(normalizedBarcode),
+      ], timeout: _privateLookupTimeout);
+
+      if (privateResult != null) {
+        final enriched =
+            allowSlowNetwork
+                ? await _enrichDrugReference(privateResult).timeout(
+                  _referenceEnrichmentTimeout,
+                  onTimeout: () => privateResult,
+                )
+                : privateResult;
         final merged = _mergeScanData(enriched, gs1Data);
-        return _withDefaults(
+        return _rememberLookup(
           normalizedBarcode,
-          merged,
-          needsPackageScan: _needsPackageScan(merged),
+          _withDefaults(
+            normalizedBarcode,
+            merged,
+            needsPackageScan: _needsPackageScan(merged),
+          ),
+        );
+      }
+
+      if (!allowSlowNetwork) {
+        if (gs1Data != null) {
+          return _rememberLookup(
+            normalizedBarcode,
+            _withDefaults(
+              normalizedBarcode,
+              gs1Data,
+              needsPackageScan: _needsPackageScan(gs1Data),
+            ),
+          );
+        }
+        return _rememberLookup(
+          normalizedBarcode,
+          _unknownDraft(normalizedBarcode),
+        );
+      }
+
+      final publicResult = await _bestLookup([
+        _lookupOpenProductsFacts(normalizedBarcode),
+        _lookupOpenFoodFacts(normalizedBarcode),
+        _lookupOpenFDA(normalizedBarcode),
+      ], timeout: _publicLookupTimeout);
+
+      if (publicResult != null) {
+        final enriched = await _enrichDrugReference(
+          publicResult,
+        ).timeout(_referenceEnrichmentTimeout, onTimeout: () => publicResult);
+        final merged = _mergeScanData(enriched, gs1Data);
+        return _rememberLookup(
+          normalizedBarcode,
+          _withDefaults(
+            normalizedBarcode,
+            merged,
+            needsPackageScan: _needsPackageScan(merged),
+          ),
         );
       }
     } catch (e) {
@@ -68,14 +126,17 @@ class BarcodeService {
     }
 
     if (gs1Data != null) {
-      return _withDefaults(
+      return _rememberLookup(
         normalizedBarcode,
-        gs1Data,
-        needsPackageScan: _needsPackageScan(gs1Data),
+        _withDefaults(
+          normalizedBarcode,
+          gs1Data,
+          needsPackageScan: _needsPackageScan(gs1Data),
+        ),
       );
     }
 
-    return _unknownDraft(normalizedBarcode);
+    return _rememberLookup(normalizedBarcode, _unknownDraft(normalizedBarcode));
   }
 
   static Future<void> rememberBarcode({
@@ -122,7 +183,7 @@ class BarcodeService {
           .select()
           .eq('barcode', barcode)
           .maybeSingle()
-          .timeout(const Duration(seconds: 4));
+          .timeout(const Duration(seconds: 2));
       if (data == null) return null;
       return {
         ...data,
@@ -144,7 +205,7 @@ class BarcodeService {
           .eq('barcode', barcode)
           .limit(1)
           .maybeSingle()
-          .timeout(const Duration(seconds: 4));
+          .timeout(const Duration(seconds: 2));
       if (data == null) return null;
 
       return {
@@ -189,7 +250,7 @@ class BarcodeService {
   }) async {
     try {
       final uri = Uri.parse('$endpoint$barcode.json');
-      final response = await http.get(uri).timeout(const Duration(seconds: 8));
+      final response = await http.get(uri).timeout(_externalHttpTimeout);
       if (response.statusCode != 200) return null;
 
       final data = jsonDecode(utf8.decode(response.bodyBytes));
@@ -243,9 +304,7 @@ class BarcodeService {
           'openfda.package_ndc:"$ndc" OR openfda.product_ndc:"$ndc"',
         );
         final uri = Uri.parse('$_openFdaApiUrl?search=$query&limit=1');
-        final response = await http
-            .get(uri)
-            .timeout(const Duration(seconds: 8));
+        final response = await http.get(uri).timeout(_externalHttpTimeout);
         if (response.statusCode != 200) continue;
 
         final data = jsonDecode(utf8.decode(response.bodyBytes));
@@ -290,6 +349,10 @@ class BarcodeService {
   ) async {
     final name = _nonEmpty(base['name']);
     if (name == null) return base;
+    if (_nonEmpty(base['category']) != null &&
+        _nonEmpty(base['dosage']) != null) {
+      return base;
+    }
 
     try {
       final references = await Future.wait([
@@ -308,6 +371,36 @@ class BarcodeService {
     }
   }
 
+  static Future<Map<String, dynamic>?> _bestLookup(
+    List<Future<Map<String, dynamic>?>> lookups, {
+    required Duration timeout,
+  }) async {
+    try {
+      final results = await Future.wait(
+        lookups.map((lookup) => lookup.timeout(timeout, onTimeout: () => null)),
+      ).timeout(timeout + const Duration(milliseconds: 250));
+
+      final candidates = results.whereType<Map<String, dynamic>>().toList();
+      if (candidates.isEmpty) return null;
+      candidates.sort((a, b) {
+        final aConfidence = (a['confidence'] as num?)?.toDouble() ?? 0.0;
+        final bConfidence = (b['confidence'] as num?)?.toDouble() ?? 0.0;
+        return bConfidence.compareTo(aConfidence);
+      });
+      return candidates.first;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Map<String, dynamic> _rememberLookup(
+    String barcode,
+    Map<String, dynamic> result,
+  ) {
+    _lookupCache[barcode] = Map<String, dynamic>.from(result);
+    return result;
+  }
+
   static Future<Map<String, dynamic>?> _lookupDailyMedByName(
     String name,
   ) async {
@@ -315,7 +408,7 @@ class BarcodeService {
       final uri = Uri.parse(
         _dailyMedSplsApiUrl,
       ).replace(queryParameters: {'drug_name': name, 'pagesize': '1'});
-      final response = await http.get(uri).timeout(const Duration(seconds: 5));
+      final response = await http.get(uri).timeout(_externalHttpTimeout);
       if (response.statusCode != 200) return null;
 
       final data = jsonDecode(utf8.decode(response.bodyBytes));
@@ -352,7 +445,7 @@ class BarcodeService {
       final uri = Uri.parse(
         _rxNormDrugsApiUrl,
       ).replace(queryParameters: {'name': name});
-      final response = await http.get(uri).timeout(const Duration(seconds: 5));
+      final response = await http.get(uri).timeout(_externalHttpTimeout);
       if (response.statusCode != 200) return null;
 
       final data = jsonDecode(utf8.decode(response.bodyBytes));
@@ -457,6 +550,12 @@ class BarcodeService {
         'brand': 'Egis',
       },
       '3838957017721': {'name': 'Линекс', 'category': 'ЖКТ', 'brand': 'Sandoz'},
+      '4607001771561': {
+        'name': 'Цетрин',
+        'category': 'От аллергии',
+        'brand': 'Dr. Reddy\'s',
+        'dosage': '10 мг',
+      },
       '3582182030006': {'name': 'Смекта', 'category': 'ЖКТ', 'brand': 'Ipsen'},
       '4601669002570': {
         'name': 'Пенталгин',
@@ -781,7 +880,11 @@ class BarcodeService {
     if (tagString.contains('allergy') ||
         tagString.contains('antihistamine') ||
         tagString.contains('аллерг') ||
-        tagString.contains('loratadine')) {
+        tagString.contains('loratadine') ||
+        tagString.contains('cetirizine') ||
+        tagString.contains('цетиризин') ||
+        tagString.contains('цетрин') ||
+        tagString.contains('супрастин')) {
       return 'От аллергии';
     }
     if (tagString.contains('antiseptic') ||

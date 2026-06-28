@@ -31,8 +31,8 @@ class _B2BPackageOcrScreenState extends State<B2BPackageOcrScreen> {
 
     final image = await _picker.pickImage(
       source: source,
-      imageQuality: 88,
-      maxWidth: 1800,
+      imageQuality: 84,
+      maxWidth: 1500,
     );
     if (image == null) return;
 
@@ -282,10 +282,22 @@ class _B2BPackageOcrScreenState extends State<B2BPackageOcrScreen> {
           _fieldTile('Категория', result.category ?? 'Не найдено'),
           _fieldTile('Дозировка', result.dosage ?? 'Не найдено'),
           _fieldTile('Упаковка', result.packageSize ?? 'Не найдено'),
+          _fieldTile('Форма', result.form ?? 'Не найдено'),
           _fieldTile('Производитель', result.manufacturer ?? 'Не найдено'),
           _fieldTile('Серия', result.batchNumber ?? 'Не найдено'),
           _fieldTile('Штрих-код', result.barcode ?? 'Не найдено'),
           _fieldTile('Срок годности', _formatDate(result.expiryDate)),
+          _fieldTile('Хранение', result.storagePlace ?? 'Не найдено'),
+          if ((result.description ?? '').isNotEmpty)
+            _fieldTile('Описание', result.description!),
+          _fieldTile(
+            'Уверенность',
+            '${(result.confidence * 100).round()}%${result.needsReview ? ' - проверьте поля' : ''}',
+          ),
+          if ((result.source ?? '').isNotEmpty)
+            _fieldTile('Источник', result.source!),
+          if ((result.lookupMessage ?? '').isNotEmpty)
+            _noticeTile(result.lookupMessage!),
           const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,
@@ -365,6 +377,29 @@ class _B2BPackageOcrScreenState extends State<B2BPackageOcrScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _noticeTile(String value) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF10B981) : const Color(0xFFA7F3D0),
+        ),
+      ),
+      child: Text(
+        value,
+        style: TextStyle(
+          color: isDark ? Colors.white : const Color(0xFF065F46),
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
   }

@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/ai/models/ai_chat_result.dart';
 import '../../features/medicine/models/medicine_model.dart';
 import '../api/smartkit_api_client.dart';
+import 'ai_runtime_config.dart';
 import 'ai_service_interface.dart';
 import 'ai_safety.dart';
 
@@ -14,6 +15,7 @@ class OllamaService implements AiService {
   OllamaService._();
 
   String? _systemContext;
+  String? _lastWorkingEndpoint;
   final List<Map<String, String>> _history = [];
   List<MedicineModel> _medicines = [];
 
@@ -54,20 +56,20 @@ class OllamaService implements AiService {
     final promptText = AiSafety.wrapUserMessageWithLanguageInstruction(text);
     final localResponse = _preflightLocalResponse(text);
     if (localResponse != null) {
-      _history.add({'role': 'user', 'content': promptText});
-      _history.add({'role': 'assistant', 'content': localResponse});
+      AiRuntimeConfig.remember(_history, 'user', promptText);
+      AiRuntimeConfig.remember(_history, 'assistant', localResponse);
       return AiChatResult(message: localResponse, threadId: threadId);
     }
 
     try {
-      _history.add({'role': 'user', 'content': promptText});
+      AiRuntimeConfig.remember(_history, 'user', promptText);
 
-      debugPrint('Ollama Request: $text');
+      debugPrint('Ollama request length: ${text.length}');
 
       final backendResponse = await _sendViaBackend(
         userText: text,
         threadId: threadId,
-      );
+      ).timeout(AiRuntimeConfig.backendTimeout, onTimeout: () => null);
       if (backendResponse != null &&
           backendResponse.message.trim().isNotEmpty) {
         var safeResponse = _appendSafetyIfNeeded(
@@ -77,31 +79,33 @@ class OllamaService implements AiService {
         if (AiSafety.appearsToUseDifferentLanguage(safeResponse, text)) {
           safeResponse = _languageSafeFallback(text);
         }
-        _history.add({'role': 'assistant', 'content': safeResponse});
+        AiRuntimeConfig.remember(_history, 'assistant', safeResponse);
         return backendResponse.copyWith(message: safeResponse);
       }
 
       for (final endpoint in _candidateBaseUrls) {
         try {
-          final response = await http.post(
-            Uri.parse(endpoint),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'model': _model,
-              'messages': _history,
-              'stream': false,
-              'options': {
-                'temperature': 0.35,
-                'top_p': 0.85,
-                'num_ctx': 8192,
-                'num_predict': 4096,
-              },
-            }),
-          );
+          final response = await http
+              .post(
+                Uri.parse(endpoint),
+                headers: {'Content-Type': 'application/json'},
+                body: jsonEncode({
+                  'model': _model,
+                  'messages': AiRuntimeConfig.compactMessages(_history),
+                  'stream': false,
+                  'options': AiRuntimeConfig.ollamaOptions(
+                    userText: text,
+                    temperature: 0.3,
+                  ),
+                }),
+              )
+              .timeout(AiRuntimeConfig.localTimeout);
 
           if (response.statusCode == 200) {
             final data = jsonDecode(utf8.decode(response.bodyBytes));
-            final responseText = data['message']['content'] as String;
+            final responseText = AiRuntimeConfig.sanitizeAssistantContent(
+              data['message']['content'] as String? ?? '',
+            );
 
             var safeResponse = _appendSafetyIfNeeded(responseText, text);
             if (AiSafety.appearsToUseDifferentLanguage(safeResponse, text)) {
@@ -124,8 +128,9 @@ class OllamaService implements AiService {
                 safeResponse = _languageSafeFallback(text);
               }
             }
-            _history.add({'role': 'assistant', 'content': safeResponse});
-            debugPrint('Ollama Response: $safeResponse');
+            _lastWorkingEndpoint = endpoint;
+            AiRuntimeConfig.remember(_history, 'assistant', safeResponse);
+            debugPrint('Ollama response length: ${safeResponse.length}');
 
             return AiChatResult(message: safeResponse, threadId: threadId);
           }
@@ -149,37 +154,39 @@ class OllamaService implements AiService {
     required String userText,
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse(endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'model': _model,
-          'messages': [
-            {
-              'role': 'system',
-              'content': AiSafety.languageRepairSystemPrompt(userText),
-            },
-            {
-              'role': 'user',
-              'content': AiSafety.languageRepairPrompt(
+      final response = await http
+          .post(
+            Uri.parse(endpoint),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'model': _model,
+              'messages': [
+                {
+                  'role': 'system',
+                  'content': AiSafety.languageRepairSystemPrompt(userText),
+                },
+                {
+                  'role': 'user',
+                  'content': AiSafety.languageRepairPrompt(
+                    userText: userText,
+                    assistantAnswer: responseText,
+                  ),
+                },
+              ],
+              'stream': false,
+              'options': AiRuntimeConfig.ollamaOptions(
                 userText: userText,
-                assistantAnswer: responseText,
+                repair: true,
               ),
-            },
-          ],
-          'stream': false,
-          'options': {
-            'temperature': 0.1,
-            'top_p': 0.8,
-            'num_ctx': 8192,
-            'num_predict': 2048,
-          },
-        }),
-      );
+            }),
+          )
+          .timeout(AiRuntimeConfig.repairTimeout);
 
       if (response.statusCode != 200) return null;
       final data = jsonDecode(utf8.decode(response.bodyBytes));
-      return data['message']['content'] as String?;
+      return AiRuntimeConfig.sanitizeAssistantContent(
+        data['message']['content'] as String? ?? '',
+      );
     } catch (error) {
       debugPrint('Ollama language repair failed: $error');
       return null;
@@ -217,26 +224,66 @@ class OllamaService implements AiService {
   }
 
   List<String> get _candidateBaseUrls {
+    final preferred =
+        _lastWorkingEndpoint == null
+            ? const <String>[]
+            : [_lastWorkingEndpoint!];
     if (kIsWeb) {
-      return const ['http://localhost:11434/api/chat'];
+      return {...preferred, 'http://localhost:11434/api/chat'}.toList();
     }
 
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return const [
+      return {
+        ...preferred,
         'http://10.0.2.2:11434/api/chat',
         'http://localhost:11434/api/chat',
-      ];
+      }.toList();
     }
 
-    return _baseUrls.take(2).toList();
+    return {...preferred, ..._baseUrls.take(2)}.toList();
   }
 
   String? _preflightLocalResponse(String text) {
     final lower = text.toLowerCase();
+    if (_looksLikeGreeting(lower)) {
+      return _quickGreetingResponse(AiSafety.detectLanguage(text));
+    }
+    if (_looksLikeCapabilitiesRequest(lower)) {
+      return _quickCapabilitiesResponse(AiSafety.detectLanguage(text));
+    }
     if (_looksLikeInventoryRequest(lower)) {
       return _inventoryAnalysis(text);
     }
     return null;
+  }
+
+  bool _looksLikeGreeting(String lower) {
+    final normalized = lower.trim();
+    return normalized.length <= 40 &&
+        [
+          'привет',
+          'здравствуй',
+          'салам',
+          'hello',
+          'hi',
+          'hey',
+          'сәлем',
+        ].any(normalized.contains);
+  }
+
+  bool _looksLikeCapabilitiesRequest(String lower) {
+    if (lower.length > 120) return false;
+    return [
+      'что ты умеешь',
+      'чем поможешь',
+      'как пользоваться',
+      'помощь',
+      'help',
+      'what can you do',
+      'how to use',
+      'не істей аласың',
+      'көмек',
+    ].any(lower.contains);
   }
 
   String _appendSafetyIfNeeded(String responseText, String userText) {
@@ -626,6 +673,28 @@ class OllamaService implements AiService {
         return 'I can check your first-aid kit, expiration dates, stock, or build a basic cart from the catalog.';
       case AiResponseLanguage.kazakh:
         return 'Дәрі қобдишасын, жарамдылық мерзімін, қалдықтарды тексеріп немесе каталогтан негізгі себет құра аламын.';
+    }
+  }
+
+  String _quickGreetingResponse(AiResponseLanguage language) {
+    switch (language) {
+      case AiResponseLanguage.russian:
+        return 'Привет! Я SmartKit AI. Могу быстро проверить аптечку, сроки годности, остатки и подсказать безопасные следующие шаги по лекарствам.';
+      case AiResponseLanguage.english:
+        return 'Hi! I am SmartKit AI. I can quickly check your first-aid kit, expiration dates, stock, and suggest safe next steps around medicines.';
+      case AiResponseLanguage.kazakh:
+        return 'Сәлем! Мен SmartKit AI. Дәрі қобдишасын, жарамдылық мерзімдерін, қалдықтарды тез тексеріп, қауіпсіз келесі қадамдарды ұсына аламын.';
+    }
+  }
+
+  String _quickCapabilitiesResponse(AiResponseLanguage language) {
+    switch (language) {
+      case AiResponseLanguage.russian:
+        return 'Я умею: проверять аптечку и сроки, находить низкие остатки, объяснять общие категории безрецептурных средств, помогать собрать базовую корзину и напоминать, когда лучше обратиться к врачу/фармацевту.';
+      case AiResponseLanguage.english:
+        return 'I can check your first-aid kit and expiry dates, find low stock, explain general OTC medicine categories, help build a basic cart, and flag when a doctor or pharmacist is needed.';
+      case AiResponseLanguage.kazakh:
+        return 'Мен дәрі қобдишасын және мерзімдерін тексере аламын, аз қалғандарын табамын, рецептісіз дәрі санаттарын түсіндіремін, негізгі себет жинауға көмектесемін және дәрігер/фармацевт керек кезде ескертемін.';
     }
   }
 

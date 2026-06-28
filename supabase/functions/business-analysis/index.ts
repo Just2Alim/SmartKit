@@ -122,7 +122,7 @@ Deno.serve(async (request) => {
           .select("name, category, stock, min_stock, price, expiry_date")
           .eq("organization_id", organizationId)
           .order("name", { ascending: true })
-          .limit(160),
+          .limit(50),
         supabase
           .from("b2b_locations")
           .select("name, type, current_items, capacity, status")
@@ -133,7 +133,7 @@ Deno.serve(async (request) => {
           .select("total_amount, sale_date")
           .eq("organization_id", organizationId)
           .order("sale_date", { ascending: false })
-          .limit(30),
+          .limit(10),
       ]);
 
     const content = await sendOllamaChat({
@@ -149,6 +149,9 @@ Deno.serve(async (request) => {
         { role: "user", content: prompt },
       ],
       temperature: 0.2,
+      numPredict: prompt.length < 180 ? 520 : 760,
+      numCtx: 3072,
+      timeoutMs: 12000,
     });
 
     return jsonResponse({ message: content });

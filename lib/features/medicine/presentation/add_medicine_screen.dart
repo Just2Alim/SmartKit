@@ -444,7 +444,8 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     try {
       final image = await _imagePicker.pickImage(
         source: ImageSource.camera,
-        imageQuality: 92,
+        imageQuality: 84,
+        maxWidth: 1500,
       );
       if (image == null) return;
 
@@ -465,7 +466,10 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
 
       final barcode = (ocr.barcode ?? barcodeCtrl.text).trim();
       if (barcode.isNotEmpty) {
-        final lookup = await BarcodeService.lookupBarcode(barcode);
+        final lookup = await BarcodeService.lookupBarcode(
+          barcode,
+          allowSlowNetwork: false,
+        );
         if (lookup != null) {
           merged.removeWhere((_, value) => value == null || value == '');
           merged = {
@@ -511,6 +515,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
       _fill(unitCtrl, result['unitLabel']);
       _fill(storageCtrl, result['storagePlace']);
       _fill(lowStockCtrl, result['lowStockThreshold']);
+      _fill(notesCtrl, result['notes'] ?? result['description']);
 
       final category = result['category']?.toString().trim();
       if (category != null && category.isNotEmpty) {

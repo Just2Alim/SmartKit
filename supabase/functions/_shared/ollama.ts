@@ -7,6 +7,9 @@ type OllamaChatOptions = {
   messages: ChatMessage[];
   model?: string;
   temperature?: number;
+  numPredict?: number;
+  numCtx?: number;
+  timeoutMs?: number;
 };
 
 function sanitizeAssistantContent(content: string): string {
@@ -17,10 +20,25 @@ export async function sendOllamaChat({
   messages,
   model,
   temperature = 0.25,
+  numPredict = 700,
+  numCtx = 3072,
+  timeoutMs = 12000,
 }: OllamaChatOptions): Promise<string> {
   const baseUrl = Deno.env.get("OLLAMA_BASE_URL") ?? "http://localhost:11434";
   const selectedModel = model ?? Deno.env.get("OLLAMA_MODEL") ?? "qwen3:latest";
   const apiKey = Deno.env.get("OLLAMA_API_KEY");
+  const lastUserIndex = messages.findLastIndex((message) =>
+    message.role === "user"
+  );
+  const optimizedMessages = messages.map((message, index) => {
+    if (index !== lastUserIndex || message.content.includes("/no_think")) {
+      return message;
+    }
+    return {
+      ...message,
+      content: `${message.content}\n\n/no_think`,
+    };
+  });
 
   const response = await fetch(`${baseUrl.replace(/\/$/, "")}/api/chat`, {
     method: "POST",
@@ -30,15 +48,17 @@ export async function sendOllamaChat({
     },
     body: JSON.stringify({
       model: selectedModel,
-      messages,
+      messages: optimizedMessages,
       stream: false,
       options: {
         temperature,
-        top_p: 0.85,
-        num_ctx: 8192,
-        num_predict: 4096,
+        top_p: 0.78,
+        num_ctx: numCtx,
+        num_predict: numPredict,
+        repeat_penalty: 1.08,
       },
     }),
+    signal: AbortSignal.timeout(timeoutMs),
   });
 
   if (!response.ok) {

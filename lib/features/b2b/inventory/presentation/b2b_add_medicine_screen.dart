@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/router/app_routes.dart';
 import '../../../../core/services/analytics_service.dart';
+import '../../../../core/services/barcode_service.dart';
 import '../data/b2b_inventory_repository.dart';
 import '../data/b2b_locations_repository.dart';
 import '../models/b2b_inventory_model.dart';
@@ -159,23 +160,34 @@ class _B2BAddMedicineScreenState extends State<B2BAddMedicineScreen> {
     final result = await Navigator.pushNamed(context, AppRoutes.b2bPackageOcr);
     if (result is! Map<String, dynamic>) return;
 
-    final ocr = B2BOcrResult.fromMap(result);
     AnalyticsService.instance.trackFeature(
       'b2b_package_ocr',
       action: 'result_applied',
     );
-    setState(() {
-      _fill(nameCtrl, ocr.name);
-      _fill(manufacturerCtrl, ocr.manufacturer);
-      _fill(barcodeCtrl, ocr.barcode);
-      _fill(batchCtrl, ocr.batchNumber);
-      _fill(dosageCtrl, ocr.dosage);
-      _fill(packageSizeCtrl, ocr.packageSize);
-      if (ocr.category != null) {
-        selectedCategory = ocr.category!;
+    var merged = Map<String, dynamic>.from(result);
+    final currentBarcode =
+        (merged['barcode']?.toString().trim().isNotEmpty ?? false)
+            ? merged['barcode'].toString().trim()
+            : barcodeCtrl.text.trim();
+
+    if (currentBarcode.isNotEmpty) {
+      final lookup = await BarcodeService.lookupBarcode(
+        currentBarcode,
+        allowSlowNetwork: false,
+      );
+      if (lookup != null) {
+        merged = {
+          ...lookup,
+          ...merged,
+          'barcode': currentBarcode,
+          'source': _combineSources(lookup['source'], merged['source']),
+        };
+      } else {
+        merged['barcode'] = currentBarcode;
       }
-      selectedExpiryDate = ocr.expiryDate ?? selectedExpiryDate;
-    });
+    }
+
+    _applyScanResult(merged);
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -183,11 +195,143 @@ class _B2BAddMedicineScreenState extends State<B2BAddMedicineScreen> {
     );
   }
 
-  void _fill(TextEditingController controller, String? value) {
-    if (value == null || value.trim().isEmpty) return;
-    if (!widget.isEditing || controller.text.trim().isEmpty) {
-      controller.text = value.trim();
+  Future<void> _scanBarcode() async {
+    final result = await Navigator.pushNamed(context, AppRoutes.scanBarcode);
+    if (!mounted || result == null || result is! Map<String, dynamic>) return;
+
+    _applyScanResult(result);
+    AnalyticsService.instance.trackFeature(
+      'b2b_barcode_scanner',
+      action: 'result_applied',
+      properties: {'needs_package_scan': result['needsPackageScan'] == true},
+    );
+
+    if (result['needsPackageScan'] == true) {
+      await _offerPackageScan(
+        result['lookupMessage']?.toString() ??
+            'Штрих-код считан. Чтобы заполнить дозировку, срок и серию, сфотографируйте упаковку.',
+      );
     }
+  }
+
+  Future<void> _offerPackageScan(String message) async {
+    final shouldScan = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      builder:
+          (context) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Досканировать упаковку?',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(message),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => Navigator.pop(context, true),
+                      icon: const Icon(Icons.document_scanner_rounded),
+                      label: const Text('Сфотографировать упаковку'),
+                    ),
+                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Оставить как есть'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+    );
+
+    if (shouldScan == true && mounted) {
+      await _scanPackage();
+    }
+  }
+
+  void _applyScanResult(Map<String, dynamic> result) {
+    final ocr = B2BOcrResult.fromMap(result);
+
+    setState(() {
+      _fill(nameCtrl, ocr.name ?? result['name']);
+      _fill(manufacturerCtrl, ocr.manufacturer ?? result['brand']);
+      _fill(barcodeCtrl, ocr.barcode ?? result['barcode']);
+      _fill(batchCtrl, ocr.batchNumber ?? result['batchNumber']);
+      _fill(dosageCtrl, ocr.dosage ?? result['dosage']);
+      _fill(packageSizeCtrl, ocr.packageSize ?? result['packageSize']);
+      _fill(descriptionCtrl, ocr.description ?? result['description']);
+
+      final category = ocr.category ?? result['category']?.toString().trim();
+      if (category != null && category.isNotEmpty) {
+        selectedCategory = category;
+      }
+
+      selectedExpiryDate =
+          ocr.expiryDate ??
+          _parseDate(result['expiryDate']) ??
+          selectedExpiryDate;
+
+      final suggestedStock =
+          ocr.suggestedStock ?? _intFrom(result['suggestedStock']) ?? 1;
+      if (stockCtrl.text.trim().isEmpty) {
+        stockCtrl.text = suggestedStock.toString();
+      }
+
+      final suggestedMinStock =
+          ocr.suggestedMinStock ?? _intFrom(result['suggestedMinStock']);
+      if (suggestedMinStock != null && minStockCtrl.text.trim().isEmpty) {
+        minStockCtrl.text = suggestedMinStock.toString();
+      }
+
+      final suggestedPrice =
+          ocr.suggestedPrice ?? _intFrom(result['suggestedPrice']);
+      if (suggestedPrice != null && priceCtrl.text.trim().isEmpty) {
+        priceCtrl.text = suggestedPrice.toString();
+      }
+    });
+  }
+
+  void _fill(TextEditingController controller, dynamic value) {
+    final text = value?.toString().trim();
+    if (text == null || text.isEmpty) return;
+    if (!widget.isEditing || controller.text.trim().isEmpty) {
+      controller.text = text;
+    }
+  }
+
+  DateTime? _parseDate(dynamic value) {
+    if (value is DateTime) return value;
+    if (value == null) return null;
+    return DateTime.tryParse(value.toString());
+  }
+
+  int? _intFrom(dynamic value) {
+    if (value is num) return value.toInt();
+    if (value == null) return null;
+    return int.tryParse(value.toString());
+  }
+
+  String _combineSources(dynamic first, dynamic second) {
+    final values =
+        [first, second]
+            .map((value) => value?.toString().trim())
+            .whereType<String>()
+            .where((value) => value.isNotEmpty)
+            .expand((value) => value.split('+'))
+            .map((value) => value.trim())
+            .where((value) => value.isNotEmpty)
+            .toSet();
+    return values.join(' + ');
   }
 
   Future<void> pickExpiryDate() async {
@@ -264,6 +408,21 @@ class _B2BAddMedicineScreenState extends State<B2BAddMedicineScreen> {
         await _repository.updateItem(item);
       } else {
         await _repository.addItem(item);
+      }
+
+      if (item.barcode != null) {
+        await BarcodeService.rememberBarcode(
+          barcode: item.barcode!,
+          medicineData: {
+            'name': item.name,
+            'category': item.category,
+            'manufacturer': item.manufacturer,
+            'dosage': item.dosage,
+            'packageSize': item.packageSize,
+            'batchNumber': item.batchNumber,
+            'source': 'B2B inventory',
+          },
+        );
       }
 
       if (!mounted) return;
@@ -429,6 +588,11 @@ class _B2BAddMedicineScreenState extends State<B2BAddMedicineScreen> {
         backgroundColor: const Color(0xFF10B981),
         foregroundColor: Colors.white,
         actions: [
+          IconButton(
+            onPressed: isLoading ? null : _scanBarcode,
+            icon: const Icon(Icons.qr_code_scanner_rounded),
+            tooltip: 'Сканировать штрих-код',
+          ),
           IconButton(
             onPressed: isLoading ? null : _scanPackage,
             icon: const Icon(Icons.document_scanner_rounded),
@@ -625,7 +789,7 @@ class _B2BAddMedicineScreenState extends State<B2BAddMedicineScreen> {
   Widget _ocrBanner() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
-      onTap: isLoading ? null : _scanPackage,
+      onTap: isLoading ? null : _scanBarcode,
       borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: const EdgeInsets.all(18),
@@ -645,12 +809,20 @@ class _B2BAddMedicineScreenState extends State<B2BAddMedicineScreen> {
             const SizedBox(width: 14),
             Expanded(
               child: Text(
-                'Сканировать упаковку для автозаполнения',
+                'Сканировать штрих-код или упаковку для автозаполнения',
                 style: TextStyle(
                   color: isDark ? Colors.white : const Color(0xFF065F46),
                   fontWeight: FontWeight.w900,
                 ),
               ),
+            ),
+            IconButton(
+              onPressed: isLoading ? null : _scanPackage,
+              icon: const Icon(
+                Icons.document_scanner_rounded,
+                color: Color(0xFF10B981),
+              ),
+              tooltip: 'Фото упаковки',
             ),
             const Icon(Icons.arrow_forward_rounded, color: Color(0xFF10B981)),
           ],

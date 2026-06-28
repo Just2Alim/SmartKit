@@ -160,11 +160,11 @@ class AiSafety {
     final language = detectLanguage(text);
     switch (language) {
       case AiResponseLanguage.russian:
-        return '${languageInstruction(language)}\n\nСообщение пользователя:\n$text';
+        return '${languageInstruction(language)} Отвечай сразу, кратко и по делу. Не выводи скрытые рассуждения, chain-of-thought или <think> блоки. /no_think\n\nСообщение пользователя:\n$text';
       case AiResponseLanguage.english:
-        return '${languageInstruction(language)}\n\nUser message:\n$text';
+        return '${languageInstruction(language)} Answer directly and concisely. Do not output hidden reasoning, chain-of-thought, or <think> blocks. /no_think\n\nUser message:\n$text';
       case AiResponseLanguage.kazakh:
-        return '${languageInstruction(language)}\n\nПайдаланушы хабарламасы:\n$text';
+        return '${languageInstruction(language)} Бірден, қысқа және нақты жауап бер. Жасырын пайымдауды, chain-of-thought немесе <think> блоктарын шығарма. /no_think\n\nПайдаланушы хабарламасы:\n$text';
     }
   }
 
