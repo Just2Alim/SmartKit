@@ -4,11 +4,65 @@ const port = Number(process.env.PORT ?? 11500);
 const host = process.env.HOST ?? '127.0.0.1';
 const ollamaBaseUrl = process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11435';
 const proxyToken = process.env.OLLAMA_PROXY_TOKEN ?? '';
+const ollamaKeepAlive = process.env.OLLAMA_KEEP_ALIVE ?? '24h';
+const maxNumCtx = envInt('OLLAMA_PROXY_NUM_CTX_MAX', 1024);
+const maxNumPredict = envInt('OLLAMA_PROXY_NUM_PREDICT_MAX', 80);
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
+
+function envInt(name, fallback) {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? Math.trunc(value) : fallback;
+}
+
+function clampInt(value, fallback, max) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return fallback;
+  return Math.min(Math.trunc(number), max);
+}
+
+function normalizeOllamaBody(request, body) {
+  if (
+    request.method !== 'POST' ||
+    !request.url?.startsWith('/api/chat') ||
+    body.length === 0
+  ) {
+    return body;
+  }
+
+  try {
+    const payload = JSON.parse(body.toString('utf8'));
+    if (payload === null || Array.isArray(payload) || typeof payload !== 'object') {
+      return body;
+    }
+
+    const options = payload.options && typeof payload.options === 'object'
+      ? { ...payload.options }
+      : {};
+
+    payload.stream = false;
+    payload.think = false;
+    payload.keep_alive = payload.keep_alive ?? ollamaKeepAlive;
+    options.num_ctx = clampInt(options.num_ctx, maxNumCtx, maxNumCtx);
+    options.num_predict = clampInt(
+      options.num_predict,
+      maxNumPredict,
+      maxNumPredict,
+    );
+    options.top_p = Number.isFinite(Number(options.top_p)) ? options.top_p : 0.78;
+    options.repeat_penalty = Number.isFinite(Number(options.repeat_penalty))
+      ? options.repeat_penalty
+      : 1.08;
+    payload.options = options;
+
+    return Buffer.from(JSON.stringify(payload));
+  } catch (_) {
+    return body;
+  }
+}
 
 const server = http.createServer(async (request, response) => {
   if (request.method === 'OPTIONS') {
@@ -51,6 +105,7 @@ const server = http.createServer(async (request, response) => {
   for await (const chunk of request) {
     chunks.push(chunk);
   }
+  const requestBody = normalizeOllamaBody(request, Buffer.concat(chunks));
 
   try {
     const upstream = await fetch(`${ollamaBaseUrl}${request.url}`, {
@@ -60,7 +115,7 @@ const server = http.createServer(async (request, response) => {
       },
       body: ['GET', 'HEAD'].includes(request.method ?? '')
         ? undefined
-        : Buffer.concat(chunks),
+        : requestBody,
     });
 
     response.writeHead(upstream.status, {

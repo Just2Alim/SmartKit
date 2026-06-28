@@ -49,6 +49,7 @@ lib/core/constants/api_keys.dart
 lib/firebase_options.dart
 .env*
 !.env.example
+.claude/
 admin/config.local.js
 *.jks
 *.keystore

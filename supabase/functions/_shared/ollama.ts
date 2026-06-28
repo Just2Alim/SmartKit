@@ -16,6 +16,38 @@ function sanitizeAssistantContent(content: string): string {
   return content.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 }
 
+function envNumber(name: string, fallback: number): number {
+  const value = Number(Deno.env.get(name));
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function compactText(value: string, max: number): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized.length > max
+    ? `${normalized.slice(0, max)}...`
+    : normalized;
+}
+
+function compactMessages(messages: ChatMessage[]): ChatMessage[] {
+  const system = messages.find((message) => message.role === "system");
+  const recent = messages
+    .filter((message) => message.role !== "system")
+    .slice(-5);
+
+  return [
+    ...(system
+      ? [{
+        ...system,
+        content: compactText(system.content, envNumber("OLLAMA_SYSTEM_MAX", 1000)),
+      }]
+      : []),
+    ...recent.map((message) => ({
+      ...message,
+      content: compactText(message.content, envNumber("OLLAMA_MESSAGE_MAX", 360)),
+    })),
+  ];
+}
+
 export async function sendOllamaChat({
   messages,
   model,
@@ -27,16 +59,20 @@ export async function sendOllamaChat({
   const baseUrl = Deno.env.get("OLLAMA_BASE_URL") ?? "http://localhost:11434";
   const selectedModel = model ?? Deno.env.get("OLLAMA_MODEL") ?? "qwen3:latest";
   const apiKey = Deno.env.get("OLLAMA_API_KEY");
-  const lastUserIndex = messages.findLastIndex((message) =>
+  const maxPredict = envNumber("OLLAMA_NUM_PREDICT_MAX", 80);
+  const maxCtx = envNumber("OLLAMA_NUM_CTX_MAX", 1024);
+  const effectiveMessages = compactMessages(messages);
+  const lastUserIndex = effectiveMessages.findLastIndex((message) =>
     message.role === "user"
   );
-  const optimizedMessages = messages.map((message, index) => {
+  const optimizedMessages = effectiveMessages.map((message, index) => {
     if (index !== lastUserIndex || message.content.includes("/no_think")) {
       return message;
     }
     return {
       ...message,
-      content: `${message.content}\n\n/no_think`,
+      content:
+        `${message.content}\n\n/no_think\nAnswer in the user's language. Keep it concise: 3-5 short bullets, under 700 characters.`,
     };
   });
 
@@ -50,11 +86,13 @@ export async function sendOllamaChat({
       model: selectedModel,
       messages: optimizedMessages,
       stream: false,
+      think: false,
+      keep_alive: Deno.env.get("OLLAMA_KEEP_ALIVE") ?? "24h",
       options: {
         temperature,
         top_p: 0.78,
-        num_ctx: numCtx,
-        num_predict: numPredict,
+        num_ctx: Math.min(numCtx, maxCtx),
+        num_predict: Math.min(numPredict, maxPredict),
         repeat_penalty: 1.08,
       },
     }),
