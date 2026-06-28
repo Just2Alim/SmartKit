@@ -79,12 +79,13 @@
    ```
 
 3. **Configure backend variables**:
-   Use `.env.example` as the template, create a local `.env`, and pass values
-   with `--dart-define-from-file=.env`.
+   Use `.env.example` as the template and create a local `.env`. For Android
+   release builds, use `scripts/build_android_release.ps1`; it passes only the
+   public Flutter values to the app and does not embed server-only secrets.
 
 4. **Run the application**:
    ```bash
-   flutter run -d chrome --dart-define-from-file=.env
+   flutter run -d chrome --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...
    ```
 
 ### Docker Deployment
